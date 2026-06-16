@@ -134,7 +134,7 @@
     <string name="comment_hint">评论内容</string>
     <string name="feedback_note">
         <![CDATA[
-            您的反馈将成为 <a href="https://github.com/hidroh/materialistic/issues">Materialistic 项目</a>在Github上的issue.
+            您的反馈将成为 <a href="https://github.com/hidroh/materialistic/issues">Hyperterialistic 项目</a>在Github上的issue.
         ]]>
     </string>
     <string name="title_required">标题不能为空</string>

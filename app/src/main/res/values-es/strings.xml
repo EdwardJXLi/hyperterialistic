@@ -39,8 +39,8 @@
     <string name="pref_highlight_updated_summary">Mostrar cambios desde la última actualización de las historias</string>
     <string name="pref_custom_tab_title">Usar pestaña personalizadas</string>
     <string name="pref_custom_tab_summary">Abrir</string>
-    <string name="app_name">Materialistic</string>
-    <string name="filter_title_item">Materialistic</string>
+    <string name="app_name">Hyperterialistic</string>
+    <string name="filter_title_item">Hyperterialistic</string>
     <string name="pref_story_display_title">Abrir por defecto</string>
     <string name="pref_theme_title">Tema de la aplicación</string>
     <string name="pref_search_sort_title">Ordenar por</string>
@@ -103,7 +103,7 @@
     <string name="send_feedback">Enviar opinión</string>
     <string name="title_hint">Título</string>
     <string name="comment_hint">Comentario</string>
-    <string name="feedback_note"><![CDATA[Tu opinión se hará pública como una <a href= https://github.com/hidroh/materialistic/issues>cuestión en el repositorio Github de Materialistic]]></string>
+    <string name="feedback_note"><![CDATA[Tu opinión se hará pública como una <a href= https://github.com/hidroh/materialistic/issues>cuestión en el repositorio Github de Hyperterialistic]]></string>
     <string name="title_required">El título es obligatorio</string>
     <string name="comment_required">El comentario es obligatorio</string>
     <string name="feedback_sent">Opinión enviada. Gracias!</string>

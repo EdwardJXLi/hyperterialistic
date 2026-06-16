@@ -1,4 +1,4 @@
-## Materialistic for Hacker News
+## Hyperterialistic for Hacker News
 Material design [Hacker News] client for Android, uses official [HackerNews/API], [Dagger] for dependency injection.
 
 [![Get it on Google Play][Play Store Badge]][Play Store]
