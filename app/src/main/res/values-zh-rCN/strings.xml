@@ -36,7 +36,7 @@
     <string name="application_info_text">
         <![CDATA[
             <p>版本: %1$s (%2$d)</p>
-            <p>本应用开源，源代码托管在 <a href="https://github.com/hidroh/materialistic">github.com/hidroh/materialistic</a></p>
+            <p>本应用开源。</p>
         ]]>
     </string>
     <string name="libraries_title">库 &amp; 资源</string>
@@ -134,7 +134,7 @@
     <string name="comment_hint">评论内容</string>
     <string name="feedback_note">
         <![CDATA[
-            您的反馈将成为 <a href="https://github.com/hidroh/materialistic/issues">Hyperterialistic 项目</a>在Github上的issue.
+            您的反馈将发送给项目维护者。
         ]]>
     </string>
     <string name="title_required">标题不能为空</string>
@@ -238,10 +238,7 @@
     <string name="comment_failed">发送评论失败</string>
     <string name="comment_successful">评论已添加，请刷新后查看</string>
     <string name="confirm_no_waiting">立即退出？</string>
-    <string name="rate_app">给应用打分</string>
-    <string name="or">或</string>
     <string name="leave_feedback">反馈</string>
-    <string name="no_playstore">无相关应用程序</string>
     <string name="submit_content_hint">链接或文本</string>
     <string name="title_activity_submit">提交到 HN</string>
     <string name="url_text_required">链接或文本不能为空</string>
@@ -268,7 +265,6 @@
     <string name="offline">离线设置</string>
     <string name="offline_notice">您目前处于离线状态</string>
     <string name="download_in_progress">下载进行中</string>
-    <string name="love_it">超爱它!</string>
     <string name="display_options">显示设置</string>
     <string name="pull_up_hint">上拉加载更多</string>
     <string name="find_in_page">在页面中查找</string>
@@ -288,7 +284,7 @@
     <string name="article_link">文章链接</string>
     <string name="hint_drag">拖动重新定位</string>
     <string name="hint_nav_short">向 \u2191 \u2193 \u2192 \u2190 滑动进行导航\n长按重新定位</string>
-    <string name="konami">You got the Konami code! Give me 5 stars?</string>
+    <string name="konami">You found the Konami code!</string>
     <string name="end_of_thread">已到底部</string>
     <string name="save_draft">保存草稿</string>
     <string name="discard_draft">舍弃草稿</string>

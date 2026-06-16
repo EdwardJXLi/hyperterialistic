@@ -103,7 +103,7 @@
     <string name="send_feedback">Enviar opinión</string>
     <string name="title_hint">Título</string>
     <string name="comment_hint">Comentario</string>
-    <string name="feedback_note"><![CDATA[Tu opinión se hará pública como una <a href= https://github.com/hidroh/materialistic/issues>cuestión en el repositorio Github de Hyperterialistic]]></string>
+    <string name="feedback_note">Tu opinión se enviará a los mantenedores del proyecto.</string>
     <string name="title_required">El título es obligatorio</string>
     <string name="comment_required">El comentario es obligatorio</string>
     <string name="feedback_sent">Opinión enviada. Gracias!</string>
@@ -178,7 +178,7 @@
     <string name="password_hint">Contraseña</string>
     <string name="login">Inicio de sesión</string>
     <string name="title_activity_login">Inicio de sesión en Hacker News</string>
-    <string name="application_info_text">"         <![CDATA[             <p>Version: %1$s (%2$d)</p>             <p>Ésta es una aplicación de código abierto disponible en <a href="https://github.com/hidroh/materialistic">github.com/hidroh/materialistic</a></p>         ]]>     "</string>
+    <string name="application_info_text">"         <![CDATA[             <p>Version: %1$s (%2$d)</p>             <p>Ésta es una aplicación de código abierto.</p>         ]]>     "</string>
     <string name="username_required">El nombre de usuario es obligatorio</string>
     <string name="password_required">La contraseña es obligatoria</string>
     <string name="login_failed">Inicio de sesión/registro fallido. Por favor, inténtalo de nuevo.</string>
@@ -205,10 +205,7 @@
     <string name="comment_failed">Envío de comentario fallido</string>
     <string name="comment_successful">Comentario añadido. Por favor actualiza para verlo.</string>
     <string name="confirm_no_waiting">Salir sin esperar?</string>
-    <string name="rate_app">Puntúa la app</string>
-    <string name="or">o</string>
     <string name="leave_feedback">Dar tu opinion</string>
-    <string name="no_playstore">No se ha encontrado la aplicación en Googe Play</string>
     <string name="submit_content_hint">Dirección URL o texto</string>
     <string name="title_activity_submit">Enviar a HN</string>
     <string name="url_text_required">La dirección URL o el texto son obligatorios</string>
@@ -235,7 +232,6 @@
     <string name="logout">Finalizar sesión</string>
     <string name="offline_notice">Estás actualmente desconectado</string>
     <string name="download_in_progress">Descarga en progreso</string>
-    <string name="love_it">Me encanta!</string>
     <string name="display_options">Opciones de visualización</string>
     <string name="pull_up_hint">Desliza hacia abajo para ver más</string>
     <string name="find_in_page">Buscar en la página</string>
@@ -254,7 +250,7 @@
     <string name="hn_link">Enlace Hacker News</string>
     <string name="article_link">Enlace artículo</string>
     <string name="hint_drag">Arrastra para volver a posicionar</string>
-    <string name="konami">Has conseguido el código Konami! Qué tal si me das 5 estrellas?</string>
+    <string name="konami">Has conseguido el código Konami!</string>
     <string name="end_of_thread">Final del hilo</string>
     <string name="save_draft">Guardar borrador</string>
     <string name="discard_draft">Descartar borrador</string>

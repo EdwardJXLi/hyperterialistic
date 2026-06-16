@@ -8,7 +8,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "io.github.hidroh.materialistic"
+        applicationId "dev.hydranet.hyperterialistic"
         minSdk = 23
         targetSdk = 36
         versionCode = 79
@@ -53,7 +53,7 @@ android {
     kotlin {
         jvmToolchain(17)
     }
-    namespace = 'io.github.hidroh.materialistic'
+    namespace = 'dev.hydranet.hyperterialistic'
 
 }
 

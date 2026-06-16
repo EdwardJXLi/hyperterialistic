@@ -53,12 +53,12 @@
     </string>
     <string translatable="false" name="third_party_licenses_text" tools:ignore="TypographyOther">
         <![CDATA[
-            <a href="https://hidroh.github.io/materialistic/licenses.html">View full text</a>
+            Full text is bundled with this app.
         ]]>
     </string>
     <string translatable="false" name="privacy_policy_text" tools:ignore="TypographyOther">
         <![CDATA[
-            <a href="https://hidroh.github.io/materialistic/privacy.html">View full text</a>
+            Full text is bundled with this app.
         ]]>
     </string>
 </resources>

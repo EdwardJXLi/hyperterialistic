@@ -1,8 +1,6 @@
 ## Hyperterialistic for Hacker News
 Material design [Hacker News] client for Android, uses official [HackerNews/API], [Dagger] for dependency injection.
 
-[![Get it on Google Play][Play Store Badge]][Play Store]
-
 ### Setup
 **Requirements**
 - JDK 17 or newer
@@ -30,13 +28,6 @@ Build with LeakCanary on
 
 Grab your Mercury Web Parser API key [here][mercury] if you want to connect to Mercury.
 
-### Articles
-- [Supporting multiple themes in your Android app (Part 1)][article-theme1]
-- [Supporting multiple themes in your Android app (Part 2)][article-theme2] [![][Android Weekly 144 Badge]][Android Weekly 144]
-- [Building custom preferences with preference-v7][article-preference]
-- [Hacking up an ad blocker for Android][article-adblocker]
-- [Bottom sheet everything][article-bottom-sheet] [![][AndroidDev Digest 99 Badge]][AndroidDev Digest 99] [![][Android Weekly 227 Badge]][Android Weekly 227]
-
 ### Screenshots
 <img src="assets/screenshot-1.png" width="200px" />
 <img src="assets/screenshot-2.png" width="200px" />
@@ -63,8 +54,6 @@ Contributions are always welcome. Please make sure you read [Contributing notes]
 
 [Hacker News]: https://news.ycombinator.com/
 [HackerNews/API]: https://github.com/HackerNews/API
-[Play Store]: https://play.google.com/store/apps/details?id=io.github.hidroh.materialistic&referrer=utm_source%3Dgithub
-[Play Store Badge]: https://play.google.com/intl/en_us/badges/images/badge_new.png
 [Algolia Hacker News Search API]: https://github.com/algolia/hn-search
 [Mercury Web Parser API]: https://mercury.postlight.com/web-parser/
 [AOSP support library]: https://developer.android.com/tools/support-library/features.html
@@ -76,15 +65,4 @@ Contributions are always welcome. Please make sure you read [Contributing notes]
 [RxJava]: https://github.com/ReactiveX/RxJava
 [RxAndroid]: https://github.com/ReactiveX/RxAndroid
 [mercury]: https://mercury.postlight.com/web-parser/
-[article-theme1]: http://www.hidroh.com/2015/02/16/support-multiple-themes-android-app/
-[article-theme2]: http://www.hidroh.com/2015/02/25/support-multiple-themes-android-app-part-2/
-[article-preference]: http://www.hidroh.com/2015/11/30/building-custom-preferences-v7/
-[article-adblocker]: http://www.hidroh.com/2016/05/19/hacking-up-ad-blocker-android/
-[article-bottom-sheet]: http://www.hidroh.com/2016/06/17/bottom-sheet-everything/
-[Android Weekly 144 Badge]: https://img.shields.io/badge/android--weekly-144-blue.svg
-[Android Weekly 227 Badge]: https://img.shields.io/badge/android--weekly-227-blue.svg
-[Android Weekly 144]: http://androidweekly.net/issues/issue-144
-[Android Weekly 227]: http://androidweekly.net/issues/issue-227
-[AndroidDev Digest 99 Badge]: https://img.shields.io/badge/androiddev--digest-99-blue.svg
-[AndroidDev Digest 99]: https://www.androiddevdigest.com/digest-99/
 [PDF.js]: https://mozilla.github.io/pdf.js/

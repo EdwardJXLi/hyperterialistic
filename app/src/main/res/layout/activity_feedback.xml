@@ -32,44 +32,6 @@
         android:paddingRight="@dimen/activity_horizontal_margin">
 
         <TextView
-            android:text="@string/rate_app"
-            style="@style/TextAppearance.AppCompat.Medium"
-            android:layout_gravity="center_horizontal"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
-
-        <FrameLayout
-            android:id="@+id/button_rate"
-            android:foreground="?attr/selectableItemBackgroundBorderless"
-            android:layout_gravity="center"
-            android:padding="@dimen/padding"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content">
-
-            <androidx.appcompat.widget.AppCompatRatingBar
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                style="?attr/ratingBarStyleSmall"
-                android:theme="@style/ThemeOverlay.App.Rating"
-                android:isIndicator="true"
-                android:clickable="true"
-                android:focusable="true"
-                android:numStars="5"
-                android:rating="5" />
-
-        </FrameLayout>
-
-        <TextView
-            android:text="@string/or"
-            style="@style/TextAppearance.AppCompat.Medium"
-            android:textStyle="italic"
-            android:gravity="center_vertical"
-            android:padding="@dimen/padding"
-            android:layout_gravity="center_horizontal"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
-
-        <TextView
             android:text="@string/leave_feedback"
             style="@style/TextAppearance.AppCompat.Medium"
             android:layout_gravity="center_horizontal"

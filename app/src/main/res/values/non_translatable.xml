@@ -20,10 +20,7 @@
     <string name="developer_info_text" translatable="false">
         <![CDATA[
             <p>
-            Ha Duy Trung
-            <a href="https://twitter.com/hadt">@hadt</a> /
-            <a href="https://github.com/hidroh">Github</a> /
-            <a href="https://hidroh.github.io">Blog</a>
+            Original app by Ha Duy Trung
             </p>
         ]]>
     </string>
@@ -69,6 +66,6 @@
         </html>
         ]]>
     </string>
-    <string name="fab_scrolling_view_behavior" translatable="false">io.github.hidroh.materialistic.FabAwareScrollBehavior</string>
+    <string name="fab_scrolling_view_behavior" translatable="false">dev.hydranet.hyperterialistic.FabAwareScrollBehavior</string>
 
 </resources>

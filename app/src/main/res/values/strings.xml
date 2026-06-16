@@ -36,7 +36,7 @@
     <string name="application_info_text">
         <![CDATA[
             <p>Version: %1$s (%2$d)</p>
-            <p>This application is open source at <a href="https://github.com/hidroh/materialistic">github.com/hidroh/materialistic</a></p>
+            <p>This application is open source.</p>
         ]]>
     </string>
     <string name="libraries_title">Libraries &amp; Resources</string>
@@ -142,7 +142,7 @@
     <string name="comment_hint">Comment</string>
     <string name="feedback_note">
         <![CDATA[
-            Your feedback will be made public as a <a href="https://github.com/hidroh/materialistic/issues">Hyperterialistic Github issue</a>.
+            Your feedback will be sent to the project maintainers.
         ]]>
     </string>
     <string name="title_required">Title is required</string>
@@ -252,10 +252,7 @@
     <string name="comment_failed">Failed to send comment</string>
     <string name="comment_successful">Comment added. Please refresh to see.</string>
     <string name="confirm_no_waiting">Exit without waiting?</string>
-    <string name="rate_app">Rate the app</string>
-    <string name="or">or</string>
     <string name="leave_feedback">Leave feedback</string>
-    <string name="no_playstore">No Play Store app found</string>
     <string name="submit_content_hint">URL or text</string>
     <string name="title_activity_submit">Submit to HN</string>
     <string name="url_text_required">URL or text is required</string>
@@ -284,7 +281,6 @@
     <string name="offline">Offline</string>
     <string name="offline_notice">You\'re currently offline</string>
     <string name="download_in_progress">Download in progress</string>
-    <string name="love_it">I love it!</string>
     <string name="display_options">Display options</string>
     <string name="pull_up_hint">Pull up for more</string>
     <string name="find_in_page">Find in page</string>
@@ -304,7 +300,7 @@
     <string name="article_link">Article link</string>
     <string name="hint_drag">Drag to reposition</string>
     <string name="hint_nav_short">Swipe \u2191 \u2193 \u2192 \u2190 to navigate\nLong press to reposition</string>
-    <string name="konami">You got the Konami code! Give me 5 stars?</string>
+    <string name="konami">You found the Konami code!</string>
     <string name="end_of_thread">End of thread</string>
     <string name="save_draft">Save draft</string>
     <string name="discard_draft">Discard draft</string>
