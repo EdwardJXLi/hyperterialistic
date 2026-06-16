@@ -5,9 +5,10 @@ Material design [Hacker News] client for Android, uses official [HackerNews/API]
 
 ### Setup
 **Requirements**
-- JDK 11
-- Latest Android SDK tools
+- JDK 17 or newer
+- Android SDK 36.1
 - Latest Android platform tools
+- Android 6.0 or newer device or emulator
 - AndroidX
 
 **Dependencies**
@@ -21,11 +22,11 @@ Material design [Hacker News] client for Android, uses official [HackerNews/API]
 
 **Build**
 
-    ./gradlew assembleDebug
+    ./gradlew :app:assembleDebug
 
 Build with LeakCanary on
 
-    ./gradlew assembleDebug -Pleak
+    ./gradlew :app:assembleDebug -Pleak
 
 Grab your Mercury Web Parser API key [here][mercury] if you want to connect to Mercury.
 

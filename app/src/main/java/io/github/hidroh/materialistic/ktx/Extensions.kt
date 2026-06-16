@@ -24,11 +24,19 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.content.FileProvider
 import io.github.hidroh.materialistic.AppUtils
-import okhttp3.internal.Util
 import java.io.Closeable
 import java.io.File
+import java.io.IOException
 
-inline fun Closeable.closeQuietly() = Util.closeQuietly(this)
+fun Closeable.closeQuietly() {
+  try {
+    close()
+  } catch (e: RuntimeException) {
+    throw e
+  } catch (_: IOException) {
+    // Ignore close failures to match the previous OkHttp internal helper behavior.
+  }
+}
 
 inline fun File.getUri(context: Context, authority: String) =
     FileProvider.getUriForFile(context, authority, this)!!

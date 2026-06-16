@@ -34,7 +34,7 @@ class AboutActivity : InjectableActivity() {
     var versionName = ""
     var versionCode = 0
     try {
-      versionName = packageManager.getPackageInfo(packageName, 0).versionName
+      versionName = packageManager.getPackageInfo(packageName, 0).versionName.orEmpty()
       versionCode = packageManager.getPackageInfo(packageName, 0).versionCode
     } catch (e: PackageManager.NameNotFoundException) {
       // do nothing
