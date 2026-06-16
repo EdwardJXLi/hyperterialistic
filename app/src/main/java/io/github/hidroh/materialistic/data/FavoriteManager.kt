@@ -31,7 +31,6 @@ import androidx.annotation.WorkerThread
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import io.github.hidroh.materialistic.DataModule
 import io.github.hidroh.materialistic.FavoriteActivity
 import io.github.hidroh.materialistic.R
 import io.github.hidroh.materialistic.ktx.closeQuietly
@@ -45,17 +44,13 @@ import rx.Scheduler
 import rx.android.schedulers.AndroidSchedulers
 import java.io.File
 import java.io.IOException
-import javax.inject.Inject
-import javax.inject.Named
-import javax.inject.Singleton
 
 /**
  * Data repository for {@link Favorite}
  */
-@Singleton
-class FavoriteManager @Inject constructor(
+class FavoriteManager(
     private val cache: LocalCache,
-    @Named(DataModule.IO_THREAD) private val ioScheduler: Scheduler,
+    private val ioScheduler: Scheduler,
     private val dao: MaterialisticDatabase.SavedStoriesDao) : LocalItemManager<Favorite> {
 
   companion object {

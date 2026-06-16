@@ -1,6 +1,4 @@
 apply plugin: 'com.android.application'
-apply plugin: 'org.jetbrains.kotlin.android'
-apply plugin: 'org.jetbrains.kotlin.kapt'
 
 android {
     compileSdk {
@@ -11,10 +9,10 @@ android {
 
     defaultConfig {
         applicationId "io.github.hidroh.materialistic"
-        minSdk 23
-        targetSdk 36
-        versionCode 79
-        versionName "3.3"
+        minSdk = 23
+        targetSdk = 36
+        versionCode = 79
+        versionName = "3.3"
         buildConfigField "int", "LATEST_RELEASE", "77"
         buildConfigField "String", "GITHUB_TOKEN", "\"\""
         buildConfigField "String", "MERCURY_TOKEN", "\"\""
@@ -28,11 +26,11 @@ android {
 
     buildTypes {
         debug {
-            minifyEnabled false
+            minifyEnabled = false
         }
         release {
-            minifyEnabled true
-            shrinkResources true
+            minifyEnabled = true
+            shrinkResources = true
         }
     }
     lint {
@@ -50,12 +48,12 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
     buildFeatures {
-        buildConfig true
+        buildConfig = true
     }
     kotlin {
         jvmToolchain(17)
     }
-    namespace 'io.github.hidroh.materialistic'
+    namespace = 'io.github.hidroh.materialistic'
 
 }
 
@@ -89,8 +87,8 @@ dependencies {
             "androidx.lifecycle:lifecycle-livedata-ktx:$lifecycleVersion",
             "androidx.lifecycle:lifecycle-compiler:$lifecycleVersion"
 
-    kapt "androidx.room:room-compiler:$roomVersion",
+    annotationProcessor "androidx.room:room-compiler:$roomVersion",
             "com.squareup.dagger:dagger-compiler:$daggerVersion"
-    kaptTest "androidx.room:room-compiler:$roomVersion",
+    testAnnotationProcessor "androidx.room:room-compiler:$roomVersion",
             "com.squareup.dagger:dagger-compiler:$daggerVersion"
 }

@@ -21,6 +21,7 @@ import android.os.Bundle
 import androidx.annotation.IdRes
 import androidx.appcompat.app.ActionBar
 import android.view.MenuItem
+import androidx.core.content.pm.PackageInfoCompat
 
 class AboutActivity : InjectableActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,8 +35,9 @@ class AboutActivity : InjectableActivity() {
     var versionName = ""
     var versionCode = 0
     try {
-      versionName = packageManager.getPackageInfo(packageName, 0).versionName.orEmpty()
-      versionCode = packageManager.getPackageInfo(packageName, 0).versionCode
+      val packageInfo = packageManager.getPackageInfo(packageName, 0)
+      versionName = packageInfo.versionName.orEmpty()
+      versionCode = PackageInfoCompat.getLongVersionCode(packageInfo).toInt()
     } catch (e: PackageManager.NameNotFoundException) {
       // do nothing
     }

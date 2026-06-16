@@ -17,19 +17,13 @@
 package io.github.hidroh.materialistic.data
 
 import androidx.annotation.WorkerThread
-import io.github.hidroh.materialistic.DataModule
 import rx.Observable
 import rx.Scheduler
-import javax.inject.Inject
-import javax.inject.Named
-import javax.inject.Singleton
 
 /**
  * Data repository for session state
  */
-@Singleton
-class SessionManager @Inject constructor(
-    @Named(DataModule.IO_THREAD)
+class SessionManager(
     private val ioScheduler: Scheduler,
     private val cache: LocalCache) {
 

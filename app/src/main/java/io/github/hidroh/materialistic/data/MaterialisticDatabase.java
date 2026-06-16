@@ -30,7 +30,8 @@ import java.util.List;
                 MaterialisticDatabase.ReadStory.class,
                 MaterialisticDatabase.Readable.class
         },
-        version = 4)
+        version = 4,
+        exportSchema = false)
 public abstract class MaterialisticDatabase extends RoomDatabase {
 
     private static final String BASE_URI = "content://io.github.hidroh.materialistic";

@@ -29,11 +29,13 @@ import io.github.hidroh.materialistic.accounts.UserServicesClient;
 import io.github.hidroh.materialistic.data.AlgoliaClient;
 import io.github.hidroh.materialistic.data.AlgoliaPopularClient;
 import io.github.hidroh.materialistic.data.FeedbackClient;
+import io.github.hidroh.materialistic.data.FavoriteManager;
 import io.github.hidroh.materialistic.data.HackerNewsClient;
 import io.github.hidroh.materialistic.data.ItemManager;
 import io.github.hidroh.materialistic.data.LocalCache;
 import io.github.hidroh.materialistic.data.MaterialisticDatabase;
 import io.github.hidroh.materialistic.data.ReadabilityClient;
+import io.github.hidroh.materialistic.data.SessionManager;
 import io.github.hidroh.materialistic.data.SyncScheduler;
 import io.github.hidroh.materialistic.data.UserManager;
 import io.github.hidroh.materialistic.data.android.Cache;
@@ -103,8 +105,30 @@ public class DataModule {
     }
 
     @Provides @Singleton
+    public Cache provideCache(MaterialisticDatabase database,
+                              MaterialisticDatabase.SavedStoriesDao savedStoriesDao,
+                              MaterialisticDatabase.ReadStoriesDao readStoriesDao,
+                              MaterialisticDatabase.ReadableDao readableDao,
+                              @Named(MAIN_THREAD) Scheduler mainScheduler) {
+        return new Cache(database, savedStoriesDao, readStoriesDao, readableDao, mainScheduler);
+    }
+
+    @Provides @Singleton
     public LocalCache provideLocalCache(Cache cache) {
         return cache;
+    }
+
+    @Provides @Singleton
+    public FavoriteManager provideFavoriteManager(LocalCache cache,
+                                                  @Named(IO_THREAD) Scheduler ioScheduler,
+                                                  MaterialisticDatabase.SavedStoriesDao savedStoriesDao) {
+        return new FavoriteManager(cache, ioScheduler, savedStoriesDao);
+    }
+
+    @Provides @Singleton
+    public SessionManager provideSessionManager(@Named(IO_THREAD) Scheduler ioScheduler,
+                                                LocalCache cache) {
+        return new SessionManager(ioScheduler, cache);
     }
 
     @Provides @Singleton

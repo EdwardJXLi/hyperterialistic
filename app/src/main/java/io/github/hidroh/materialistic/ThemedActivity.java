@@ -106,7 +106,8 @@ public abstract class ThemedActivity extends AppCompatActivity {
         if (!TextUtils.isEmpty(title)) {
             setTaskDescription(new ActivityManager.TaskDescription(title.toString(),
                     BitmapFactory.decodeResource(getResources(), R.drawable.ic_app),
-                    ContextCompat.getColor(this, AppUtils.getThemedResId(this, R.attr.colorPrimary))));
+                    ContextCompat.getColor(this,
+                            AppUtils.getThemedResId(this, androidx.appcompat.R.attr.colorPrimary))));
         }
     }
 }
