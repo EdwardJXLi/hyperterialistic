@@ -35,6 +35,8 @@ import androidx.fragment.app.Fragment;
 import androidx.core.content.ContextCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import androidx.core.graphics.drawable.DrawableCompat;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.appcompat.app.ActionBar;
 import android.text.TextUtils;
 import android.text.method.LinkMovementMethod;
@@ -43,6 +45,7 @@ import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -139,6 +142,7 @@ public class ItemActivity extends InjectableActivity implements ItemFragment.Ite
         }
         setContentView(R.layout.activity_item);
         setSupportActionBar(findViewById(R.id.toolbar));
+        applyStatusBarInsets(findViewById(R.id.status_bar_spacer));
         //noinspection ConstantConditions
         getSupportActionBar().setDisplayOptions(ActionBar.DISPLAY_SHOW_HOME |
                 ActionBar.DISPLAY_HOME_AS_UP);
@@ -185,6 +189,19 @@ public class ItemActivity extends InjectableActivity implements ItemFragment.Ite
         if (!AppUtils.hasConnection(this)) {
             Snackbar.make(mCoordinatorLayout, R.string.offline_notice, Snackbar.LENGTH_LONG).show();
         }
+    }
+
+    private void applyStatusBarInsets(View statusBarSpacer) {
+        ViewCompat.setOnApplyWindowInsetsListener(statusBarSpacer, (view, insets) -> {
+            int top = insets.getInsets(WindowInsetsCompat.Type.systemBars()).top;
+            ViewGroup.LayoutParams layoutParams = view.getLayoutParams();
+            if (layoutParams.height != top) {
+                layoutParams.height = top;
+                view.setLayoutParams(layoutParams);
+            }
+            return insets;
+        });
+        ViewCompat.requestApplyInsets(statusBarSpacer);
     }
 
     @Override

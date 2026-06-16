@@ -49,6 +49,7 @@ public abstract class SpinnerPreference extends Preference {
 
     public SpinnerPreference(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
+        setLayoutResource(R.layout.preference_spinner_row);
         setWidgetLayoutResource(R.layout.preference_spinner);
         init(context, attrs);
     }

@@ -21,7 +21,12 @@ import androidx.fragment.app.Fragment;
 import androidx.appcompat.app.ActionBar;
 import androidx.preference.PreferenceFragmentCompat;
 import androidx.appcompat.widget.Toolbar;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
+
 import android.view.MenuItem;
+import android.view.View;
+import android.view.ViewGroup;
 
 public class PreferencesActivity extends ThemedActivity {
     public static final String EXTRA_TITLE = PreferencesActivity.class.getName() + ".EXTRA_TITLE";
@@ -32,7 +37,9 @@ public class PreferencesActivity extends ThemedActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_preferences);
         setTitle(getIntent().getIntExtra(EXTRA_TITLE, 0));
-        setSupportActionBar((Toolbar) findViewById(R.id.toolbar));
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        applyStatusBarInsets(findViewById(R.id.status_bar_spacer));
         //noinspection ConstantConditions
         getSupportActionBar().setDisplayOptions(ActionBar.DISPLAY_SHOW_HOME |
                 ActionBar.DISPLAY_HOME_AS_UP | ActionBar.DISPLAY_SHOW_TITLE);
@@ -46,6 +53,19 @@ public class PreferencesActivity extends ThemedActivity {
                             SettingsFragment.class.getName())
                     .commit();
         }
+    }
+
+    private void applyStatusBarInsets(View statusBarSpacer) {
+        ViewCompat.setOnApplyWindowInsetsListener(statusBarSpacer, (view, insets) -> {
+            int top = insets.getInsets(WindowInsetsCompat.Type.systemBars()).top;
+            ViewGroup.LayoutParams layoutParams = view.getLayoutParams();
+            if (layoutParams.height != top) {
+                layoutParams.height = top;
+                view.setLayoutParams(layoutParams);
+            }
+            return insets;
+        });
+        ViewCompat.requestApplyInsets(statusBarSpacer);
     }
 
     @Override
