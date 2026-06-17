@@ -20,6 +20,8 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.text.TextUtils;
 
+import java.util.Set;
+
 final class ArticleCache {
     private static final String PREFERENCES_FILE = "article_cache";
 
@@ -38,6 +40,21 @@ final class ArticleCache {
 
     static void clear(Context context) {
         preferences(context).edit().clear().apply();
+    }
+
+    static void retainOnly(Context context, Set<String> retainedUrls) {
+        SharedPreferences preferences = preferences(context);
+        if (retainedUrls == null || retainedUrls.isEmpty()) {
+            preferences.edit().clear().apply();
+            return;
+        }
+        SharedPreferences.Editor editor = preferences.edit();
+        for (String url : preferences.getAll().keySet()) {
+            if (!retainedUrls.contains(url)) {
+                editor.remove(url);
+            }
+        }
+        editor.apply();
     }
 
     private static SharedPreferences preferences(Context context) {

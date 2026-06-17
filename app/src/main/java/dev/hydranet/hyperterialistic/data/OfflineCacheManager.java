@@ -18,6 +18,7 @@ package dev.hydranet.hyperterialistic.data;
 
 import android.content.Context;
 import android.os.Build;
+import android.text.TextUtils;
 import android.text.format.Formatter;
 
 import androidx.annotation.NonNull;
@@ -25,8 +26,14 @@ import androidx.annotation.NonNull;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 
 import dev.hydranet.hyperterialistic.R;
+import dev.hydranet.hyperterialistic.widget.CacheableWebView;
 
 public class OfflineCacheManager {
     private static final int MAX_SCAN_BYTES = 256 * 1024;
@@ -60,6 +67,85 @@ public class OfflineCacheManager {
         HackerNewsItemCache.clear(mContext);
         StoryListCache.clear(mContext);
         mDatabase.getReadableDao().deleteAll();
+    }
+
+    public void garbageCollect() {
+        RetainedCache retainedCache = collectRetainedCache();
+        HackerNewsItemCache.retainOnly(mContext, retainedCache.itemIds);
+        ArticleCache.retainOnly(mContext, retainedCache.articleUrls);
+        deleteStaleWebArchives(mContext.getCacheDir(), retainedCache.articleUrls);
+        if (retainedCache.itemIds.isEmpty()) {
+            mDatabase.getReadableDao().deleteAll();
+        } else {
+            mDatabase.getReadableDao().deleteExcept(new ArrayList<>(retainedCache.itemIds));
+        }
+    }
+
+    private RetainedCache collectRetainedCache() {
+        RetainedCache retainedCache = new RetainedCache();
+        collectStoryList(retainedCache, ItemManager.TOP_FETCH_MODE);
+        collectStoryList(retainedCache, ItemManager.BEST_FETCH_MODE);
+        List<String> savedItemIds = mDatabase.getSavedStoriesDao().selectItemIds();
+        for (String itemId : savedItemIds) {
+            collectItemTree(retainedCache, itemId);
+        }
+        return retainedCache;
+    }
+
+    private void collectStoryList(RetainedCache retainedCache, @ItemManager.FetchMode String filter) {
+        int[] itemIds = StoryListCache.get(mContext, filter);
+        if (itemIds == null) {
+            return;
+        }
+        for (int itemId : itemIds) {
+            collectItemTree(retainedCache, String.valueOf(itemId));
+        }
+    }
+
+    private void collectItemTree(RetainedCache retainedCache, String itemId) {
+        if (TextUtils.isEmpty(itemId) || !retainedCache.itemIds.add(itemId)) {
+            return;
+        }
+        HackerNewsItem item = HackerNewsItemCache.get(mContext, itemId);
+        if (item == null) {
+            return;
+        }
+        if (item.isStoryType() && !TextUtils.isEmpty(item.getUrl())) {
+            retainedCache.articleUrls.add(item.getUrl());
+        }
+        if (item.getKids() == null) {
+            return;
+        }
+        for (long kid : item.getKids()) {
+            collectItemTree(retainedCache, String.valueOf(kid));
+        }
+    }
+
+    private void deleteStaleWebArchives(File dir, Set<String> retainedUrls) {
+        if (dir == null || !dir.isDirectory()) {
+            return;
+        }
+        Set<String> retainedArchiveNames = new HashSet<>();
+        for (String url : retainedUrls) {
+            retainedArchiveNames.add(CacheableWebView.getArchiveFile(mContext, url).getName());
+        }
+        deleteStaleWebArchives(dir, retainedArchiveNames);
+    }
+
+    private void deleteStaleWebArchives(File dir, Set<String> retainedArchiveNames) {
+        File[] files = dir.listFiles();
+        if (files == null) {
+            return;
+        }
+        for (File file : files) {
+            if (file.isDirectory()) {
+                deleteStaleWebArchives(file, retainedArchiveNames);
+            } else if (CacheableWebView.isArchiveFile(file) &&
+                    !retainedArchiveNames.contains(file.getName())) {
+                //noinspection ResultOfMethodCallIgnored
+                file.delete();
+            }
+        }
     }
 
     private void scanOkHttpCache(File dir, Stats stats) {
@@ -166,5 +252,10 @@ public class OfflineCacheManager {
                     otherItems,
                     Formatter.formatFileSize(context, bytes));
         }
+    }
+
+    private static class RetainedCache {
+        final Set<String> itemIds = new LinkedHashSet<>();
+        final Set<String> articleUrls = new HashSet<>();
     }
 }

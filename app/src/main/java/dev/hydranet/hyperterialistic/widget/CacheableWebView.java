@@ -124,11 +124,18 @@ public class CacheableWebView extends WebView {
     }
 
     private String generateCacheFilename(String url) {
-        return getContext().getApplicationContext().getCacheDir().getAbsolutePath() +
-                File.separator +
-                CACHE_PREFIX +
-                url.hashCode() +
-                CACHE_EXTENSION;
+        return getArchiveFile(getContext(), url).getAbsolutePath();
+    }
+
+    public static File getArchiveFile(Context context, String url) {
+        return new File(context.getApplicationContext().getCacheDir(),
+                CACHE_PREFIX + url.hashCode() + CACHE_EXTENSION);
+    }
+
+    public static boolean isArchiveFile(File file) {
+        return file != null && file.isFile() &&
+                file.getName().startsWith(CACHE_PREFIX) &&
+                file.getName().endsWith(CACHE_EXTENSION);
     }
 
     public static class ArchiveClient extends WebChromeClient {

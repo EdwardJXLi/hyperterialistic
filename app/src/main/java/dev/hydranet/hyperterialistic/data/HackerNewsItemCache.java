@@ -22,6 +22,8 @@ import android.text.TextUtils;
 
 import com.google.gson.Gson;
 
+import java.util.Set;
+
 final class HackerNewsItemCache {
     private static final String PREFERENCES_FILE = "hn_item_cache";
     private static final Gson GSON = new Gson();
@@ -54,6 +56,21 @@ final class HackerNewsItemCache {
 
     static void clear(Context context) {
         preferences(context).edit().clear().apply();
+    }
+
+    static void retainOnly(Context context, Set<String> retainedItemIds) {
+        SharedPreferences preferences = preferences(context);
+        if (retainedItemIds == null || retainedItemIds.isEmpty()) {
+            preferences.edit().clear().apply();
+            return;
+        }
+        SharedPreferences.Editor editor = preferences.edit();
+        for (String itemId : preferences.getAll().keySet()) {
+            if (!retainedItemIds.contains(itemId)) {
+                editor.remove(itemId);
+            }
+        }
+        editor.apply();
     }
 
     private static SharedPreferences preferences(Context context) {

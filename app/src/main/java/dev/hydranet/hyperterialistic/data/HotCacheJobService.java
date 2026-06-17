@@ -79,7 +79,9 @@ public class HotCacheJobService extends JobService {
         }
         mThread = new Thread(() -> {
             Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
-            cacheHotStories();
+            if (cacheHotStories()) {
+                new OfflineCacheManager(this).garbageCollect();
+            }
             cancelProgress();
             jobFinished(params, false);
         }, "hot-cache-sync");
@@ -98,7 +100,7 @@ public class HotCacheJobService extends JobService {
         return true;
     }
 
-    private void cacheHotStories() {
+    private boolean cacheHotStories() {
         HackerNewsClient.RestService service = mFactory.create(HackerNewsClient.BASE_API_URL,
                 HackerNewsClient.RestService.class);
         int limit = Preferences.Offline.getHotCacheCount(this);
@@ -114,7 +116,7 @@ public class HotCacheJobService extends JobService {
         int downloaded = 0;
         for (Integer id : ids) {
             if (Thread.currentThread().isInterrupted()) {
-                return;
+                return false;
             }
             if (!isCached(service, String.valueOf(id))) {
                 syncStory(String.valueOf(id));
@@ -122,6 +124,7 @@ public class HotCacheJobService extends JobService {
             downloaded++;
             updateProgress(downloaded, total, false);
         }
+        return !Thread.currentThread().isInterrupted();
     }
 
     private boolean isCached(@NonNull HackerNewsClient.RestService service, @NonNull String id) {
@@ -184,7 +187,9 @@ public class HotCacheJobService extends JobService {
             return cachedItem;
         }
         try {
-            return service.cachedItem(id).execute().body();
+            HackerNewsItem item = service.cachedItem(id).execute().body();
+            HackerNewsItemCache.put(this, item);
+            return item;
         } catch (IOException e) {
             return null;
         }

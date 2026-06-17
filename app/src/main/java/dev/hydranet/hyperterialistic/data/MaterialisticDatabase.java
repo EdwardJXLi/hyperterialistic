@@ -293,6 +293,9 @@ public abstract class MaterialisticDatabase extends RoomDatabase {
         @Query("SELECT * FROM saved WHERE itemid = :itemId")
         @Nullable
         SavedStory selectByItemId(String itemId);
+
+        @Query("SELECT itemid FROM saved")
+        List<String> selectItemIds();
     }
 
     @Dao
@@ -317,6 +320,9 @@ public abstract class MaterialisticDatabase extends RoomDatabase {
 
         @Query("DELETE FROM readable")
         int deleteAll();
+
+        @Query("DELETE FROM readable WHERE itemid IS NULL OR itemid NOT IN (:retainedItemIds)")
+        int deleteExcept(List<String> retainedItemIds);
     }
 
     static class DbConstants {
