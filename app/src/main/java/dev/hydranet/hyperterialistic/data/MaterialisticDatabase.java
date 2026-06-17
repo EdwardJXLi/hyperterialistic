@@ -311,6 +311,12 @@ public abstract class MaterialisticDatabase extends RoomDatabase {
 
         @Query("SELECT * FROM readable WHERE itemid = :itemId LIMIT 1")
         Readable selectByItemId(String itemId);
+
+        @Query("SELECT COUNT(*) FROM readable")
+        int count();
+
+        @Query("DELETE FROM readable")
+        int deleteAll();
     }
 
     static class DbConstants {

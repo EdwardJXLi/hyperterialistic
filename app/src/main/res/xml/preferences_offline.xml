@@ -30,16 +30,37 @@
 
     <androidx.preference.SwitchPreferenceCompat
         app:iconSpaceReserved="false"
+        android:key="@string/pref_hot_cache"
+        android:title="@string/pref_hot_cache_title"
+        android:summary="@string/pref_hot_cache_summary"
+        android:defaultValue="false" />
+
+    <dev.hydranet.hyperterialistic.preference.SimpleSpinnerPreference
+        android:key="@string/pref_hot_cache_count"
+        android:title="@string/pref_hot_cache_count_title"
+        android:dependency="@string/pref_hot_cache"
+        android:defaultValue="20"
+        app:entries="@array/pref_hot_cache_count_options"
+        app:entryValues="@array/pref_hot_cache_count_values" />
+
+    <dev.hydranet.hyperterialistic.preference.SimpleSpinnerPreference
+        android:key="@string/pref_hot_cache_frequency"
+        android:title="@string/pref_hot_cache_frequency_title"
+        android:dependency="@string/pref_hot_cache"
+        android:defaultValue="3"
+        app:entries="@array/pref_widget_frequency_options"
+        app:entryValues="@array/pref_widget_frequency_values" />
+
+    <androidx.preference.SwitchPreferenceCompat
+        app:iconSpaceReserved="false"
         android:key="@string/pref_offline_notification"
         android:title="@string/pref_offline_notification_title"
         android:summary="@string/pref_offline_notification_summary"
-        android:dependency="@string/pref_saved_item_sync"
         android:defaultValue="false" />
 
     <dev.hydranet.hyperterialistic.preference.SimpleSpinnerPreference
         android:key="@string/pref_offline_data"
         android:title="@string/pref_offline_data_title"
-        android:dependency="@string/pref_saved_item_sync"
         android:defaultValue="wifi"
         app:entries="@array/offline_data_options"
         app:entryValues="@array/offline_data_values" />
@@ -48,21 +69,38 @@
         app:iconSpaceReserved="false"
         android:key="@string/pref_offline_comments"
         android:title="@string/pref_offline_comments_title"
-        android:dependency="@string/pref_saved_item_sync"
         android:defaultValue="true" />
 
     <androidx.preference.CheckBoxPreference
         app:iconSpaceReserved="false"
         android:key="@string/pref_offline_article"
         android:title="@string/pref_offline_article_title"
-        android:dependency="@string/pref_saved_item_sync"
         android:defaultValue="true" />
 
     <androidx.preference.CheckBoxPreference
         app:iconSpaceReserved="false"
         android:key="@string/pref_offline_readability"
         android:title="@string/pref_offline_readability_title"
-        android:dependency="@string/pref_saved_item_sync"
         android:defaultValue="true" />
+
+    <Preference
+        app:iconSpaceReserved="false"
+        android:key="@string/pref_offline_cache_stats"
+        android:title="@string/pref_offline_cache_stats_title"
+        android:summary="@string/offline_cache_calculating"
+        android:selectable="false" />
+
+    <Preference
+        app:iconSpaceReserved="false"
+        android:key="@string/pref_refresh_offline_cache"
+        android:title="@string/pref_refresh_offline_cache_title"
+        android:summary="@string/pref_refresh_offline_cache_summary"
+        android:dependency="@string/pref_hot_cache" />
+
+    <Preference
+        app:iconSpaceReserved="false"
+        android:key="@string/pref_clear_offline_cache"
+        android:title="@string/pref_clear_offline_cache_title"
+        android:summary="@string/pref_clear_offline_cache_summary" />
 
 </androidx.preference.PreferenceScreen>

@@ -105,7 +105,8 @@ public class WidgetService extends RemoteViewsService {
 
         @Override
         public void onDataSetChanged() {
-            mItems = mItemManager.getStories(mFilter, ItemManager.MODE_NETWORK);
+            mItems = mItemManager.getStories(mFilter,
+                    AppUtils.cacheModeForConnection(mContext, ItemManager.MODE_NETWORK));
         }
 
         @Override
@@ -127,7 +128,8 @@ public class WidgetService extends RemoteViewsService {
                 return remoteViews;
             }
             if (!isItemAvailable(item)) {
-                Item remoteItem = mItemManager.getItem(item.getId(), ItemManager.MODE_NETWORK);
+                Item remoteItem = mItemManager.getItem(item.getId(),
+                        AppUtils.cacheModeForConnection(mContext, ItemManager.MODE_NETWORK));
                 if (remoteItem != null) {
                     item.populate(remoteItem);
                 } else {

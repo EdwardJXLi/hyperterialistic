@@ -16,6 +16,8 @@
 
 package dev.hydranet.hyperterialistic.data;
 
+import android.content.Context;
+
 import androidx.annotation.NonNull;
 
 import java.io.IOException;
@@ -44,11 +46,14 @@ public class HackerNewsClient implements ItemManager, UserManager {
     private final RestService mRestService;
     private final SessionManager mSessionManager;
     private final FavoriteManager mFavoriteManager;
+    private final Context mContext;
 
     @Inject
-    public HackerNewsClient(RestServiceFactory factory,
+    public HackerNewsClient(Context context,
+                            RestServiceFactory factory,
                             SessionManager sessionManager,
                             FavoriteManager favoriteManager) {
+        mContext = context.getApplicationContext();
         mRestService = factory.rxEnabled(true).create(BASE_API_URL, RestService.class);
         mSessionManager = sessionManager;
         mFavoriteManager = favoriteManager;
@@ -63,8 +68,16 @@ public class HackerNewsClient implements ItemManager, UserManager {
         Observable.defer(() -> getStoriesObservable(filter, cacheMode))
                 .subscribeOn(mIoScheduler)
                 .observeOn(mMainThreadScheduler)
-                .subscribe(listener::onResponse,
-                        t -> listener.onError(t != null ? t.getMessage() : ""));
+                .subscribe(items -> listener.onResponse(items != null ?
+                                items : getCachedStories(filter)),
+                        t -> {
+                            Item[] cached = getCachedStories(filter);
+                            if (cached != null) {
+                                listener.onResponse(cached);
+                            } else {
+                                listener.onError(t != null ? t.getMessage() : "");
+                            }
+                        });
     }
 
     @Override
@@ -76,14 +89,20 @@ public class HackerNewsClient implements ItemManager, UserManager {
         switch (cacheMode) {
             case MODE_DEFAULT:
             default:
-                itemObservable = mRestService.itemRx(itemId);
+                itemObservable = mRestService.itemRx(itemId)
+                        .doOnNext(item -> HackerNewsItemCache.put(mContext, item));
                 break;
             case MODE_NETWORK:
-                itemObservable = mRestService.networkItemRx(itemId);
+                itemObservable = mRestService.networkItemRx(itemId)
+                        .doOnNext(item -> HackerNewsItemCache.put(mContext, item));
                 break;
             case MODE_CACHE:
-                itemObservable = mRestService.cachedItemRx(itemId)
-                        .onErrorResumeNext(mRestService.itemRx(itemId));
+                itemObservable = Observable.fromCallable(() -> HackerNewsItemCache.get(mContext, itemId))
+                        .flatMap(item -> item != null ?
+                                Observable.just(item) :
+                                mRestService.cachedItemRx(itemId)
+                                        .doOnNext(cachedItem ->
+                                                HackerNewsItemCache.put(mContext, cachedItem)));
                 break;
         }
         Observable.defer(() -> Observable.zip(
@@ -108,9 +127,15 @@ public class HackerNewsClient implements ItemManager, UserManager {
     @Override
     public Item[] getStories(String filter, @CacheMode int cacheMode) {
         try {
-            return toItems(getStoriesCall(filter, cacheMode).execute().body());
+            int[] ids = getStoriesCall(filter, cacheMode).execute().body();
+            if (ids == null) {
+                ids = StoryListCache.get(mContext, normalizeFilter(filter));
+            }
+            Item[] items = toItems(ids);
+            return items != null ? items : new Item[0];
         } catch (IOException e) {
-            return new Item[0];
+            Item[] cached = getCachedStories(filter);
+            return cached != null ? cached : new Item[0];
         }
     }
 
@@ -119,16 +144,24 @@ public class HackerNewsClient implements ItemManager, UserManager {
         Call<HackerNewsItem> call;
         switch (cacheMode) {
             case MODE_DEFAULT:
-            case MODE_CACHE:
             default:
                 call = mRestService.item(itemId);
+                break;
+            case MODE_CACHE:
+                HackerNewsItem cachedItem = HackerNewsItemCache.get(mContext, itemId);
+                if (cachedItem != null) {
+                    return cachedItem;
+                }
+                call = mRestService.cachedItem(itemId);
                 break;
             case MODE_NETWORK:
                 call = mRestService.networkItem(itemId);
                 break;
         }
         try {
-            return call.execute().body();
+            HackerNewsItem item = call.execute().body();
+            HackerNewsItemCache.put(mContext, item);
+            return item;
         } catch (IOException e) {
             return null;
         }
@@ -182,6 +215,15 @@ public class HackerNewsClient implements ItemManager, UserManager {
                 break;
         }
         return observable.map(this::toItems);
+    }
+
+    @NonNull
+    private String normalizeFilter(String filter) {
+        return filter == null ? NEW_FETCH_MODE : filter;
+    }
+
+    private Item[] getCachedStories(String filter) {
+        return toItems(StoryListCache.get(mContext, normalizeFilter(filter)));
     }
 
     @NonNull

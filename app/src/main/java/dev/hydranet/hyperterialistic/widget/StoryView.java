@@ -25,6 +25,7 @@ import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.drawable.DrawableCompat;
 import android.text.Spannable;
+import android.text.TextUtils;
 import android.text.SpannableString;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
@@ -44,6 +45,7 @@ import java.util.Locale;
 import dev.hydranet.hyperterialistic.AppUtils;
 import dev.hydranet.hyperterialistic.R;
 import dev.hydranet.hyperterialistic.annotation.Synthetic;
+import dev.hydranet.hyperterialistic.data.OfflineItemCache;
 import dev.hydranet.hyperterialistic.data.Item;
 import dev.hydranet.hyperterialistic.data.WebItem;
 
@@ -68,6 +70,8 @@ public class StoryView extends RelativeLayout implements Checkable {
     @Synthetic final ViewSwitcher mVoteSwitcher;
     private final View mMoreButton;
     private final Drawable mCommentDrawable;
+    private final Drawable mCachedDrawable;
+    private final Drawable mPartialCachedDrawable;
     private final View mBackground;
     private boolean mChecked;
 
@@ -100,6 +104,12 @@ public class StoryView extends RelativeLayout implements Checkable {
         mCommentDrawable = DrawableCompat.wrap(ContextCompat.getDrawable(context,
                 R.drawable.ic_comment_white_24dp).mutate());
         DrawableCompat.setTint(mCommentDrawable, mAccentColorResId);
+        mCachedDrawable = DrawableCompat.wrap(ContextCompat.getDrawable(context,
+                R.drawable.ic_done_white_24dp).mutate());
+        DrawableCompat.setTint(mCachedDrawable, mPromotedColorResId);
+        mPartialCachedDrawable = DrawableCompat.wrap(ContextCompat.getDrawable(context,
+                R.drawable.ic_cloud_off_white_24dp).mutate());
+        DrawableCompat.setTint(mPartialCachedDrawable, mHotColorResId);
         inflate(context, mIsLocal ? R.layout.local_story_view : R.layout.story_view, this);
         mBackground = findViewById(R.id.background);
         mBackground.setBackgroundColor(mBackgroundColor);
@@ -169,6 +179,7 @@ public class StoryView extends RelativeLayout implements Checkable {
             }
         }
         mCommentButton.setVisibility(View.VISIBLE);
+        hideCacheStatus();
         mTitleTextView.setText(getContext().getString(R.string.loading_text));
         mTitleTextView.setText(story.getDisplayedTitle());
         mPostedTextView.setText(story.getDisplayedTime(getContext()));
@@ -202,7 +213,46 @@ public class StoryView extends RelativeLayout implements Checkable {
         mPostedTextView.setText(R.string.loading_text);
         mSourceTextView.setText(R.string.loading_text);
         mSourceTextView.setCompoundDrawables(null, null, null, null);
+        hideCacheStatus();
         mCommentButton.setVisibility(View.INVISIBLE);
+    }
+
+    public void setCached(boolean cached) {
+        setCacheStatus(cached ? OfflineItemCache.CACHE_FULL : OfflineItemCache.CACHE_NONE);
+    }
+
+    public void setCacheStatus(int status) {
+        Drawable drawable;
+        int description;
+        switch (status) {
+            case OfflineItemCache.CACHE_FULL:
+                drawable = mCachedDrawable;
+                description = R.string.cached;
+                break;
+            case OfflineItemCache.CACHE_PARTIAL:
+                drawable = mPartialCachedDrawable;
+                description = R.string.partially_cached;
+                break;
+            case OfflineItemCache.CACHE_NONE:
+            default:
+                drawable = null;
+                description = 0;
+                break;
+        }
+        mPostedTextView.setCompoundDrawablesWithIntrinsicBounds(
+                drawable, null, null, null);
+        mPostedTextView.setCompoundDrawablePadding(
+                drawable != null ? getResources().getDimensionPixelSize(R.dimen.padding) : 0);
+        // The drawable carries no text, so keep the posted time announced and just
+        // append the cache state instead of replacing it.
+        mPostedTextView.setContentDescription(description != 0 ?
+                TextUtils.concat(mPostedTextView.getText(), ", ",
+                        getContext().getString(description)) :
+                null);
+    }
+
+    private void hideCacheStatus() {
+        setCached(false);
     }
 
     public void setViewed(boolean isViewed) {

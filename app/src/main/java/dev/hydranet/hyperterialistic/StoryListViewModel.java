@@ -27,7 +27,7 @@ public class StoryListViewModel extends ViewModel {
             Observable.fromCallable(() -> mItemManager.getStories(filter, cacheMode))
                     .subscribeOn(mIoThreadScheduler)
                     .observeOn(AndroidSchedulers.mainThread())
-                    .subscribe(items -> setItems(items));
+                    .subscribe(items -> setItems(items), throwable -> setItems(null));
         }
         return mItems;
     }
@@ -39,7 +39,7 @@ public class StoryListViewModel extends ViewModel {
         Observable.fromCallable(() -> mItemManager.getStories(filter, cacheMode))
                 .subscribeOn(mIoThreadScheduler)
                 .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(items -> setItems(items));
+                .subscribe(items -> setItems(items), throwable -> setItems(null));
 
     }
 

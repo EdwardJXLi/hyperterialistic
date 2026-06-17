@@ -61,6 +61,8 @@
         android:layout_marginLeft="@dimen/cardview_min_height"
         android:layout_marginStart="@dimen/cardview_min_height"
         android:layout_toLeftOf="@id/comment"
+        android:layout_toStartOf="@id/comment"
+        android:layout_alignWithParentIfMissing="true"
         android:paddingBottom="@dimen/padding"
         android:maxLines="1" />
 

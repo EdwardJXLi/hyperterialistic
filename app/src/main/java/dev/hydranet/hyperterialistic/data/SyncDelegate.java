@@ -18,6 +18,7 @@ package dev.hydranet.hyperterialistic.data;
 
 import android.accounts.Account;
 import android.accounts.AccountManager;
+import android.Manifest;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -28,6 +29,7 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.BitmapFactory;
 import android.os.Build;
 import android.os.Bundle;
@@ -52,6 +54,7 @@ import androidx.annotation.RequiresApi;
 import androidx.annotation.UiThread;
 import androidx.annotation.VisibleForTesting;
 import androidx.core.app.NotificationCompat;
+import androidx.core.content.ContextCompat;
 import dev.hydranet.hyperterialistic.AppUtils;
 import dev.hydranet.hyperterialistic.BuildConfig;
 import dev.hydranet.hyperterialistic.ItemActivity;
@@ -67,7 +70,7 @@ public class SyncDelegate {
     static final String SYNC_PREFERENCES_FILE = "_syncpreferences";
     private static final String NOTIFICATION_GROUP_KEY = "group";
     private static final String SYNC_ACCOUNT_NAME = "Materialistic";
-    private static final long TIMEOUT_MILLIS = DateUtils.MINUTE_IN_MILLIS;
+    private static final long TIMEOUT_MILLIS = 10 * DateUtils.MINUTE_IN_MILLIS;
     private static final String DOWNLOADS_CHANNEL_ID = "downloads";
 
     private final HackerNewsClient.RestService mHnRestService;
@@ -110,6 +113,7 @@ public class SyncDelegate {
                 .setGroup(NOTIFICATION_GROUP_KEY)
                 .setOnlyAlertOnce(true)
                 .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+                .setOngoing(true)
                 .setAutoCancel(true);
     }
 
@@ -118,6 +122,19 @@ public class SyncDelegate {
         if (!Preferences.Offline.isEnabled(context)) {
             return;
         }
+        schedule(context, job);
+    }
+
+    @UiThread
+    static void scheduleHotItemSync(Context context, Job job) {
+        if (!Preferences.Offline.isHotCacheEnabled(context)) {
+            return;
+        }
+        schedule(context, job);
+    }
+
+    @UiThread
+    private static void schedule(Context context, Job job) {
         if (!TextUtils.isEmpty(job.id)) {
             JobInfo.Builder builder = new JobInfo.Builder(Long.valueOf(job.id).intValue(),
                     new ComponentName(context.getPackageName(),
@@ -203,6 +220,7 @@ public class SyncDelegate {
 
     @Synthetic
     void sync(@NonNull HackerNewsItem item) {
+        HackerNewsItemCache.put(mContext, item);
         mSharedPreferences.edit().remove(item.getId()).apply();
         notifyItem(item.getId(), item);
         syncReadability(item);
@@ -219,6 +237,10 @@ public class SyncDelegate {
 
     private void syncArticle(@NonNull HackerNewsItem item) {
         if (mJob.articleEnabled && item.isStoryType() && !TextUtils.isEmpty(item.getUrl())) {
+            if (ArticleCache.contains(mContext, item.getUrl())) {
+                notifyArticle(100);
+                return;
+            }
             if (Looper.myLooper() == Looper.getMainLooper()) {
                 loadArticle(item);
             } else {
@@ -237,6 +259,9 @@ public class SyncDelegate {
             public void onProgressChanged(WebView view, int newProgress) {
                 super.onProgressChanged(view, newProgress);
                 notifyArticle(newProgress);
+                if (newProgress == 100) {
+                    ArticleCache.put(mContext, item.getUrl());
+                }
             }
         });
         notifyArticle(0);
@@ -256,6 +281,10 @@ public class SyncDelegate {
     }
 
     private HackerNewsItem getFromCache(String itemId) {
+        HackerNewsItem cachedItem = HackerNewsItemCache.get(mContext, itemId);
+        if (cachedItem != null) {
+            return cachedItem;
+        }
         try {
             return mHnRestService.cachedItem(itemId).execute().body();
         } catch (IOException e) {
@@ -291,6 +320,9 @@ public class SyncDelegate {
     }
 
     private void showProgress() {
+        if (!canPostNotifications()) {
+            return;
+        }
         mNotificationManager.notify(Integer.valueOf(mJob.id), mNotificationBuilder
                 .setContentTitle(mSyncProgress.title)
                 .setContentText(mContext.getString(R.string.download_in_progress))
@@ -299,6 +331,12 @@ public class SyncDelegate {
                 .setProgress(mSyncProgress.getMax(), mSyncProgress.getProgress(), false)
                 .setSortKey(mJob.id)
                 .build());
+    }
+
+    private boolean canPostNotifications() {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                ContextCompat.checkSelfPermission(mContext, Manifest.permission.POST_NOTIFICATIONS) ==
+                        PackageManager.PERMISSION_GRANTED;
     }
 
     private void finish() {
@@ -363,7 +401,7 @@ public class SyncDelegate {
             if (TextUtils.equals(id, this.id)) {
                 finishSelf(item, kidsEnabled, readabilityEnabled);
             } else {
-                finishKid();
+                finishKid(item, kidsEnabled);
             }
         }
 
@@ -393,7 +431,10 @@ public class SyncDelegate {
             }
         }
 
-        private void finishKid() {
+        private void finishKid(@Nullable HackerNewsItem item, boolean kidsEnabled) {
+            if (kidsEnabled && item != null && item.getKids() != null) {
+                totalKids += item.getKids().length;
+            }
             finishedKids++;
         }
     }

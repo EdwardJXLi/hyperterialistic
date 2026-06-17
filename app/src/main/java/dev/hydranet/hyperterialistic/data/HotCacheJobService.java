@@ -1,0 +1,249 @@
+/*
+ * Copyright (c) 2016 Ha Duy Trung
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package dev.hydranet.hyperterialistic.data;
+
+import android.annotation.TargetApi;
+import android.Manifest;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.job.JobParameters;
+import android.app.job.JobService;
+import android.content.pm.PackageManager;
+import android.os.Build;
+import android.os.Process;
+import android.text.TextUtils;
+
+import java.io.IOException;
+import java.util.LinkedHashSet;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
+import javax.inject.Inject;
+
+import androidx.annotation.NonNull;
+import androidx.core.app.NotificationCompat;
+import androidx.core.content.ContextCompat;
+import dev.hydranet.hyperterialistic.ActivityModule;
+import dev.hydranet.hyperterialistic.Injectable;
+import dev.hydranet.hyperterialistic.Preferences;
+import dev.hydranet.hyperterialistic.R;
+
+@TargetApi(Build.VERSION_CODES.LOLLIPOP)
+public class HotCacheJobService extends JobService {
+    private static final int NOTIFICATION_ID = Integer.MAX_VALUE - 2;
+    private static final String DOWNLOADS_CHANNEL_ID = "downloads";
+
+    @Inject RestServiceFactory mFactory;
+    @Inject ReadabilityClient mReadabilityClient;
+    @Inject LocalCache mLocalCache;
+    private volatile Thread mThread;
+    private NotificationManager mNotificationManager;
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        ((Injectable) getApplication())
+                .getApplicationGraph()
+                .plus(new ActivityModule(this))
+                .inject(this);
+        mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(DOWNLOADS_CHANNEL_ID,
+                    getString(R.string.notification_channel_downloads),
+                    NotificationManager.IMPORTANCE_LOW);
+            mNotificationManager.createNotificationChannel(channel);
+        }
+    }
+
+    @Override
+    public boolean onStartJob(JobParameters params) {
+        if (!Preferences.Offline.isHotCacheEnabled(this) ||
+                !Preferences.Offline.currentConnectionEnabled(this)) {
+            jobFinished(params, false);
+            return false;
+        }
+        mThread = new Thread(() -> {
+            Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
+            cacheHotStories();
+            cancelProgress();
+            jobFinished(params, false);
+        }, "hot-cache-sync");
+        mThread.start();
+        return true;
+    }
+
+    @Override
+    public boolean onStopJob(JobParameters params) {
+        Thread thread = mThread;
+        if (thread != null) {
+            thread.interrupt();
+            mThread = null;
+        }
+        cancelProgress();
+        return true;
+    }
+
+    private void cacheHotStories() {
+        HackerNewsClient.RestService service = mFactory.create(HackerNewsClient.BASE_API_URL,
+                HackerNewsClient.RestService.class);
+        int limit = Preferences.Offline.getHotCacheCount(this);
+        Set<Integer> ids = new LinkedHashSet<>();
+        updateProgress(0, 0, true);
+        int[] topStories = networkTopStories(service);
+        int[] bestStories = networkBestStories(service);
+        StoryListCache.put(this, ItemManager.TOP_FETCH_MODE, topStories, limit);
+        StoryListCache.put(this, ItemManager.BEST_FETCH_MODE, bestStories, limit);
+        addStories(ids, topStories, limit);
+        addStories(ids, bestStories, limit);
+        int total = ids.size();
+        int downloaded = 0;
+        for (Integer id : ids) {
+            if (Thread.currentThread().isInterrupted()) {
+                return;
+            }
+            if (!isCached(service, String.valueOf(id))) {
+                syncStory(String.valueOf(id));
+            }
+            downloaded++;
+            updateProgress(downloaded, total, false);
+        }
+    }
+
+    private boolean isCached(@NonNull HackerNewsClient.RestService service, @NonNull String id) {
+        HackerNewsItem item = cachedItem(service, id);
+        if (item == null) {
+            return false;
+        }
+        return isReadabilityCached(item) && isArticleCached(item) &&
+                areCommentsCached(service, item);
+    }
+
+    private boolean isReadabilityCached(@NonNull HackerNewsItem item) {
+        return !Preferences.Offline.isReadabilityEnabled(this) ||
+                !item.isStoryType() ||
+                mLocalCache.getReadability(item.getId()) != null;
+    }
+
+    private boolean isArticleCached(@NonNull HackerNewsItem item) {
+        return !Preferences.Offline.isArticleEnabled(this) ||
+                !item.isStoryType() ||
+                TextUtils.isEmpty(item.getUrl()) ||
+                ArticleCache.contains(this, item.getUrl());
+    }
+
+    private boolean areCommentsCached(@NonNull HackerNewsClient.RestService service,
+                                      @NonNull HackerNewsItem item) {
+        if (!Preferences.Offline.isCommentsEnabled(this) || item.getKids() == null) {
+            return true;
+        }
+        for (long kid : item.getKids()) {
+            HackerNewsItem child = cachedItem(service, String.valueOf(kid));
+            if (child == null || !areCommentsCached(service, child)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void syncStory(@NonNull String id) {
+        CountDownLatch latch = new CountDownLatch(1);
+        SyncDelegate syncDelegate = new SyncDelegate(this, mFactory, mReadabilityClient);
+        syncDelegate.subscribe(token -> latch.countDown());
+        syncDelegate.performSync(new SyncDelegate.JobBuilder(this, id)
+                .setNotificationEnabled(false)
+                .build());
+        try {
+            if (!latch.await(10, TimeUnit.MINUTES)) {
+                syncDelegate.stopSync();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            syncDelegate.stopSync();
+        }
+    }
+
+    private HackerNewsItem cachedItem(@NonNull HackerNewsClient.RestService service,
+                                      @NonNull String id) {
+        HackerNewsItem cachedItem = HackerNewsItemCache.get(this, id);
+        if (cachedItem != null) {
+            return cachedItem;
+        }
+        try {
+            return service.cachedItem(id).execute().body();
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    private void addStories(@NonNull Set<Integer> ids, int[] stories, int limit) {
+        if (stories == null) {
+            return;
+        }
+        for (int i = 0; i < stories.length && i < limit; i++) {
+            ids.add(stories[i]);
+        }
+    }
+
+    private int[] networkTopStories(HackerNewsClient.RestService service) {
+        try {
+            return service.networkTopStories().execute().body();
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    private int[] networkBestStories(HackerNewsClient.RestService service) {
+        try {
+            return service.networkBestStories().execute().body();
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    private void updateProgress(int progress, int max, boolean indeterminate) {
+        if (!Preferences.Offline.isNotificationEnabled(this) || !canPostNotifications()) {
+            return;
+        }
+        NotificationCompat.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ?
+                new NotificationCompat.Builder(this, DOWNLOADS_CHANNEL_ID) :
+                new NotificationCompat.Builder(this);
+        mNotificationManager.notify(NOTIFICATION_ID, builder
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(getString(R.string.hot_cache_in_progress))
+                .setContentText(indeterminate ?
+                        getString(R.string.download_in_progress) :
+                        getString(R.string.hot_cache_progress, progress, max))
+                .setOnlyAlertOnce(true)
+                .setOngoing(true)
+                .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+                .setProgress(max, progress, indeterminate)
+                .build());
+    }
+
+    private boolean canPostNotifications() {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+                        PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void cancelProgress() {
+        if (mNotificationManager != null) {
+            mNotificationManager.cancel(NOTIFICATION_ID);
+        }
+    }
+}

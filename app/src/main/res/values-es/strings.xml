@@ -58,7 +58,7 @@
     <string name="pref_lazy_load_title">Cargar contenido bajo demanda</string>
     <string name="pref_lazy_load_summary">Cargar contenido sólo cuando se cambia a la pestaña</string>
     <string name="pref_saved_item_sync_title">Activar acceso sin conexión</string>
-    <string name="pref_saved_item_sync_summary">Descargar contenido cuando guardes una historia</string>
+    <string name="pref_saved_item_sync_summary">Descargar contenido cuando abras o guardes una historia</string>
     <string name="pref_offline_data_title">Cuándo descargar el contenido</string>
     <string name="pref_offline_comments_title">Descargar comentarios</string>
     <string name="pref_offline_article_title">Descargar artículo</string>

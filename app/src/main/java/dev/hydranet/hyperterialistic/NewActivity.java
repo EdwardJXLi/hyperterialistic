@@ -50,6 +50,6 @@ public class NewActivity extends BaseStoriesActivity {
 
     @Override
     protected int getItemCacheMode() {
-        return ItemManager.MODE_NETWORK;
+        return AppUtils.cacheModeForConnection(this, ItemManager.MODE_NETWORK);
     }
 }

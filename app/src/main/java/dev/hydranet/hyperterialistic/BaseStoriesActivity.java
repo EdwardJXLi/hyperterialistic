@@ -16,6 +16,11 @@
 
 package dev.hydranet.hyperterialistic;
 
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.net.ConnectivityManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.SystemClock;
@@ -32,6 +37,17 @@ public abstract class BaseStoriesActivity extends BaseListActivity
 
     private static final String STATE_LAST_UPDATED = "state:lastUpdated";
     @Synthetic Long mLastUpdated;
+    private boolean mConnectivityReceiverRegistered;
+    private final BroadcastReceiver mConnectivityReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (!ConnectivityManager.CONNECTIVITY_ACTION.equals(intent.getAction())) {
+                return;
+            }
+            mHandler.removeCallbacks(mLastUpdateTask);
+            mHandler.post(mLastUpdateTask);
+        }
+    };
     private final Runnable mLastUpdateTask = new Runnable() {
         @Override
         public void run() {
@@ -67,12 +83,21 @@ public abstract class BaseStoriesActivity extends BaseListActivity
     @Override
     protected void onResume() {
         super.onResume();
+        if (!mConnectivityReceiverRegistered) {
+            registerReceiver(mConnectivityReceiver,
+                    new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION));
+            mConnectivityReceiverRegistered = true;
+        }
         mHandler.removeCallbacks(mLastUpdateTask);
         mHandler.post(mLastUpdateTask);
     }
 
     @Override
     protected void onPause() {
+        if (mConnectivityReceiverRegistered) {
+            unregisterReceiver(mConnectivityReceiver);
+            mConnectivityReceiverRegistered = false;
+        }
         super.onPause();
         mHandler.removeCallbacks(mLastUpdateTask);
     }

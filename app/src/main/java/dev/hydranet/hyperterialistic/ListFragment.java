@@ -17,7 +17,11 @@
 package dev.hydranet.hyperterialistic;
 
 import androidx.lifecycle.Observer;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.net.ConnectivityManager;
 import android.net.Uri;
 import android.os.Bundle;
 import androidx.annotation.Nullable;
@@ -79,7 +83,19 @@ public class ListFragment extends BaseListFragment {
     private View mEmptyView;
     private RefreshCallback mRefreshCallback;
     private String mFilter;
-    private int mCacheMode = ItemManager.MODE_DEFAULT;
+    @ItemManager.CacheMode private int mRequestedCacheMode = ItemManager.MODE_DEFAULT;
+    @ItemManager.CacheMode private int mCacheMode = ItemManager.MODE_DEFAULT;
+    private boolean mConnected;
+    private boolean mConnectivityReceiverRegistered;
+    private final BroadcastReceiver mConnectivityReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (!TextUtils.equals(intent.getAction(), ConnectivityManager.CONNECTIVITY_ACTION)) {
+                return;
+            }
+            updateConnectionState(true);
+        }
+    };
 
     public interface RefreshCallback {
         void onRefreshed();
@@ -101,10 +117,14 @@ public class ListFragment extends BaseListFragment {
         super.onCreate(savedInstanceState);
         if (savedInstanceState != null) {
             mFilter = savedInstanceState.getString(STATE_FILTER);
-            mCacheMode = savedInstanceState.getInt(STATE_CACHE_MODE);
+            mRequestedCacheMode = savedInstanceState.getInt(STATE_CACHE_MODE);
+            if (mRequestedCacheMode == ItemManager.MODE_CACHE) {
+                mRequestedCacheMode = ItemManager.MODE_DEFAULT;
+            }
         } else {
             mFilter = getArguments().getString(EXTRA_FILTER);
         }
+        updateEffectiveCacheMode();
     }
 
     @Override
@@ -122,8 +142,8 @@ public class ListFragment extends BaseListFragment {
             mSwipeRefreshLayout.setRefreshing(true);
         }
         mSwipeRefreshLayout.setOnRefreshListener(() -> {
-            mCacheMode = ItemManager.MODE_NETWORK;
-            getAdapter().setCacheMode(mCacheMode);
+            mRequestedCacheMode = ItemManager.MODE_NETWORK;
+            updateEffectiveCacheMode();
             refresh();
         });
         return view;
@@ -156,7 +176,7 @@ public class ListFragment extends BaseListFragment {
             getAdapter().setHotThresHold(AppUtils.HOT_THRESHOLD_HIGH);
         }
         getAdapter().initDisplayOptions(mRecyclerView);
-        getAdapter().setCacheMode(mCacheMode);
+        updateEffectiveCacheMode();
         getAdapter().setUpdateListener((showAll, itemCount, actionClickListener) -> {
             if (showAll) {
                 Snackbar.make(mRecyclerView,
@@ -193,7 +213,27 @@ public class ListFragment extends BaseListFragment {
     public void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
         outState.putString(STATE_FILTER, mFilter);
-        outState.putInt(STATE_CACHE_MODE, mCacheMode);
+        outState.putInt(STATE_CACHE_MODE, mRequestedCacheMode);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (!mConnectivityReceiverRegistered) {
+            requireContext().registerReceiver(mConnectivityReceiver,
+                    new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION));
+            mConnectivityReceiverRegistered = true;
+        }
+        updateConnectionState(false);
+    }
+
+    @Override
+    public void onPause() {
+        if (mConnectivityReceiverRegistered) {
+            requireContext().unregisterReceiver(mConnectivityReceiver);
+            mConnectivityReceiverRegistered = false;
+        }
+        super.onPause();
     }
 
     @Override
@@ -227,6 +267,24 @@ public class ListFragment extends BaseListFragment {
     private void refresh() {
         getAdapter().setShowAll(true);
         mStoryListViewModel.refreshStories(mFilter, mCacheMode);
+    }
+
+    private void updateConnectionState(boolean refreshOnReconnect) {
+        boolean connected = AppUtils.hasConnection(requireContext());
+        boolean reconnected = connected && !mConnected;
+        mConnected = connected;
+        updateEffectiveCacheMode();
+        if (refreshOnReconnect && reconnected && mStoryListViewModel != null) {
+            mSwipeRefreshLayout.setRefreshing(true);
+            refresh();
+        }
+    }
+
+    private void updateEffectiveCacheMode() {
+        mCacheMode = AppUtils.cacheModeForConnection(requireContext(), mRequestedCacheMode);
+        if (mAdapter != null) {
+            getAdapter().setCacheMode(mCacheMode);
+        }
     }
 
     @Synthetic

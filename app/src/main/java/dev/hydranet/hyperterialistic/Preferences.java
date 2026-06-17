@@ -339,6 +339,15 @@ public class Preferences {
         }
     }
 
+    private static int getIntFromString(Context context, @StringRes int key, int defaultValue) {
+        String intValue = get(context, key, null);
+        try {
+            return Integer.parseInt(intValue);
+        } catch (NumberFormatException | NullPointerException e) {
+            return defaultValue;
+        }
+    }
+
     @Synthetic
     static String get(Context context, @StringRes int key, String defaultValue) {
         return get(context, context.getString(key), defaultValue);
@@ -486,23 +495,33 @@ public class Preferences {
 
     @PublicApi
     public static class Offline {
+        static final int DEFAULT_HOT_CACHE_COUNT = 20;
+        static final int DEFAULT_HOT_CACHE_INTERVAL_HOURS = 3;
 
         public static boolean isEnabled(Context context) {
             return get(context, R.string.pref_saved_item_sync, false);
         }
 
+        public static boolean isHotCacheEnabled(Context context) {
+            return get(context, R.string.pref_hot_cache, false);
+        }
+
+        public static boolean isAnySyncEnabled(Context context) {
+            return isEnabled(context) || isHotCacheEnabled(context);
+        }
+
         public static boolean isCommentsEnabled(Context context) {
-            return isEnabled(context) &&
+            return isAnySyncEnabled(context) &&
                     get(context, R.string.pref_offline_comments, true);
         }
 
         public static boolean isArticleEnabled(Context context) {
-            return isEnabled(context) &&
+            return isAnySyncEnabled(context) &&
                     get(context, R.string.pref_offline_article, true);
         }
 
         public static boolean isReadabilityEnabled(Context context) {
-            return isEnabled(context) &&
+            return isAnySyncEnabled(context) &&
                     get(context, R.string.pref_offline_readability, true);
         }
 
@@ -517,6 +536,18 @@ public class Preferences {
         public static boolean isWifiOnly(Context context) {
             String wifiValue = context.getString(R.string.offline_data_wifi);
             return TextUtils.equals(wifiValue, get(context, R.string.pref_offline_data, wifiValue));
+        }
+
+        public static int getHotCacheCount(Context context) {
+            int count = getIntFromString(context, R.string.pref_hot_cache_count,
+                    DEFAULT_HOT_CACHE_COUNT);
+            return Math.max(1, Math.min(count, 100));
+        }
+
+        public static int getHotCacheIntervalHours(Context context) {
+            int hours = getIntFromString(context, R.string.pref_hot_cache_frequency,
+                    DEFAULT_HOT_CACHE_INTERVAL_HOURS);
+            return Math.max(1, hours);
         }
     }
 

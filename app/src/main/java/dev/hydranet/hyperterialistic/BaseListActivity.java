@@ -49,6 +49,7 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import dev.hydranet.hyperterialistic.annotation.Synthetic;
 import dev.hydranet.hyperterialistic.data.ItemManager;
 import dev.hydranet.hyperterialistic.data.SessionManager;
+import dev.hydranet.hyperterialistic.data.SyncScheduler;
 import dev.hydranet.hyperterialistic.data.WebItem;
 import dev.hydranet.hyperterialistic.widget.ItemPagerAdapter;
 import dev.hydranet.hyperterialistic.widget.NavFloatingActionButton;
@@ -72,6 +73,7 @@ public abstract class BaseListActivity extends DrawerActivity implements MultiPa
     @Inject ActionViewResolver mActionViewResolver;
     @Inject PopupMenu mPopupMenu;
     @Inject SessionManager mSessionManager;
+    @Inject SyncScheduler mSyncScheduler;
     @Inject CustomTabsDelegate mCustomTabsDelegate;
     @Inject KeyDelegate mKeyDelegate;
     private AppBarLayout mAppBar;
@@ -339,7 +341,7 @@ public abstract class BaseListActivity extends DrawerActivity implements MultiPa
      */
     @ItemManager.CacheMode
     protected int getItemCacheMode() {
-        return ItemManager.MODE_DEFAULT;
+        return AppUtils.cacheModeForConnection(this, ItemManager.MODE_DEFAULT);
     }
 
     @Synthetic
@@ -373,6 +375,7 @@ public abstract class BaseListActivity extends DrawerActivity implements MultiPa
     }
 
     private void openSinglePaneItem() {
+        scheduleSelectedItemSync();
         if (mExternalBrowser && mStoryViewMode != Preferences.StoryViewMode.Comment) {
             AppUtils.openWebUrlExternal(this, mSelectedItem, mSelectedItem.getUrl(), mCustomTabsDelegate.getSession());
         } else {
@@ -399,6 +402,14 @@ public abstract class BaseListActivity extends DrawerActivity implements MultiPa
             mViewPager.setVisibility(View.VISIBLE);
             bindViewPager();
             mSessionManager.view(mSelectedItem.getId());
+            scheduleSelectedItemSync();
+        }
+    }
+
+    private void scheduleSelectedItemSync() {
+        if (mSelectedItem != null && mSelectedItem.isStoryType() &&
+                !TextUtils.isEmpty(mSelectedItem.getId())) {
+            mSyncScheduler.scheduleSync(this, mSelectedItem.getId());
         }
     }
 

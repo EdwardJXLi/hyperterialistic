@@ -63,6 +63,17 @@
                     android:layout_height="match_parent"
                     android:gravity="center_vertical" />
 
+                <ImageView
+                    android:id="@id/cache_status"
+                    android:src="@drawable/ic_cloud_off_white_24dp"
+                    android:contentDescription="@string/cached"
+                    android:visibility="gone"
+                    android:layout_gravity="center_vertical"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:padding="2dp"
+                    app:tint="?android:attr/textColorSecondary" />
+
                 <include layout="@layout/button_more"
                     android:id="@+id/button_more"
                     android:layout_width="36dp"

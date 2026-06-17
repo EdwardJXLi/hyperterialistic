@@ -41,6 +41,11 @@ public class WebCacheService extends Service {
             stopSelf(startId);
             return START_STICKY;
         }
+        String url = intent.getStringExtra(EXTRA_URL);
+        if (ArticleCache.contains(this, url)) {
+            stopSelf(startId);
+            return START_NOT_STICKY;
+        }
         CacheableWebView webView = new CacheableWebView(this);
         webView.setWebViewClient(new AdBlockWebViewClient(Preferences.adBlockEnabled(this)));
         webView.setWebChromeClient(new CacheableWebView.ArchiveClient() {
@@ -48,11 +53,12 @@ public class WebCacheService extends Service {
             public void onProgressChanged(WebView view, int newProgress) {
                 super.onProgressChanged(view, newProgress);
                 if (newProgress == 100) {
+                    ArticleCache.put(WebCacheService.this, url);
                     stopSelf(startId);
                 }
             }
         });
-        webView.loadUrl(intent.getStringExtra(EXTRA_URL));
+        webView.loadUrl(url);
         return START_STICKY;
     }
 }

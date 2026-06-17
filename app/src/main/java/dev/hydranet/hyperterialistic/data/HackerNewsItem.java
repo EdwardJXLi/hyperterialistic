@@ -90,12 +90,12 @@ class HackerNewsItem implements Item {
     private long next, previous;
 
     // non parcelable fields
-    private HackerNewsItem[] kidItems;
-    private HackerNewsItem parentItem;
-    private Spannable displayedTime;
-    private Spannable displayedAuthor;
-    private CharSequence displayedText;
-    private int defaultColor;
+    private transient HackerNewsItem[] kidItems;
+    private transient HackerNewsItem parentItem;
+    private transient Spannable displayedTime;
+    private transient Spannable displayedAuthor;
+    private transient CharSequence displayedText;
+    private transient int defaultColor;
 
     public static final Creator<HackerNewsItem> CREATOR = new Creator<HackerNewsItem>() {
         @Override

@@ -73,6 +73,7 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import dev.hydranet.hyperterialistic.annotation.PublicApi;
 import dev.hydranet.hyperterialistic.data.HackerNewsClient;
 import dev.hydranet.hyperterialistic.data.Item;
+import dev.hydranet.hyperterialistic.data.ItemManager;
 import dev.hydranet.hyperterialistic.data.WebItem;
 import dev.hydranet.hyperterialistic.widget.PopupMenu;
 
@@ -307,6 +308,11 @@ public class AppUtils {
         NetworkInfo activeNetworkInfo = ((ConnectivityManager) context.getSystemService(
                 Context.CONNECTIVITY_SERVICE)).getActiveNetworkInfo();
         return activeNetworkInfo != null && activeNetworkInfo.isConnectedOrConnecting();
+    }
+
+    @ItemManager.CacheMode
+    public static int cacheModeForConnection(Context context, @ItemManager.CacheMode int cacheMode) {
+        return hasConnection(context) ? cacheMode : ItemManager.MODE_CACHE;
     }
 
     @SuppressLint("MissingPermission")

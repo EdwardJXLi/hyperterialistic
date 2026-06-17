@@ -64,6 +64,7 @@ import dev.hydranet.hyperterialistic.data.ItemManager;
 import dev.hydranet.hyperterialistic.data.MaterialisticDatabase;
 import dev.hydranet.hyperterialistic.data.ResponseListener;
 import dev.hydranet.hyperterialistic.data.SessionManager;
+import dev.hydranet.hyperterialistic.data.SyncScheduler;
 import dev.hydranet.hyperterialistic.data.WebItem;
 import dev.hydranet.hyperterialistic.widget.ItemPagerAdapter;
 import dev.hydranet.hyperterialistic.widget.NavFloatingActionButton;
@@ -79,6 +80,7 @@ public class ItemActivity extends InjectableActivity implements ItemFragment.Ite
     private static final String STATE_ITEM = "state:item";
     private static final String STATE_ITEM_ID = "state:itemId";
     private static final String STATE_FULLSCREEN = "state:fullscreen";
+    private static final String STATE_SYNCED_OPENED_ITEM_ID = "state:syncedOpenedItemId";
     @Synthetic WebItem mItem;
     @Synthetic String mItemId = null;
     @Synthetic ImageView mBookmark;
@@ -90,17 +92,20 @@ public class ItemActivity extends InjectableActivity implements ItemFragment.Ite
     @Inject PopupMenu mPopupMenu;
     @Inject UserServices mUserServices;
     @Inject SessionManager mSessionManager;
+    @Inject SyncScheduler mSyncScheduler;
     @Inject CustomTabsDelegate mCustomTabsDelegate;
     @Inject KeyDelegate mKeyDelegate;
     private TabLayout mTabLayout;
     @Synthetic AppBarLayout mAppBar;
     @Synthetic CoordinatorLayout mCoordinatorLayout;
+    @ItemManager.CacheMode private int mCacheMode = ItemManager.MODE_DEFAULT;
     private ImageButton mVoteButton;
     private FloatingActionButton mReplyButton;
     private NavFloatingActionButton mNavButton;
     private ItemPagerAdapter mAdapter;
     private ViewPager mViewPager;
     @Synthetic boolean mFullscreen;
+    private String mSyncedOpenedItemId;
     private final Observer<Uri> mObserver = uri -> {
         if (mItem == null) {
             return;
@@ -140,6 +145,8 @@ public class ItemActivity extends InjectableActivity implements ItemFragment.Ite
         } else {
             mStoryViewMode = Preferences.getDefaultStoryView(this);
         }
+        mCacheMode = AppUtils.cacheModeForConnection(this,
+                getIntent().getIntExtra(EXTRA_CACHE_MODE, ItemManager.MODE_DEFAULT));
         setContentView(R.layout.activity_item);
         setSupportActionBar(findViewById(R.id.toolbar));
         applyStatusBarInsets(findViewById(R.id.status_bar_spacer));
@@ -170,6 +177,7 @@ public class ItemActivity extends InjectableActivity implements ItemFragment.Ite
             mItem = savedInstanceState.getParcelable(STATE_ITEM);
             mItemId = savedInstanceState.getString(STATE_ITEM_ID);
             mFullscreen = savedInstanceState.getBoolean(STATE_FULLSCREEN);
+            mSyncedOpenedItemId = savedInstanceState.getString(STATE_SYNCED_OPENED_ITEM_ID);
         } else {
             if (Intent.ACTION_VIEW.equalsIgnoreCase(intent.getAction())) {
                 mItemId = AppUtils.getDataUriId(intent, PARAM_ID);
@@ -183,7 +191,7 @@ public class ItemActivity extends InjectableActivity implements ItemFragment.Ite
             bindData(mItem);
         } else if (!TextUtils.isEmpty(mItemId)) {
             mItemManager.getItem(mItemId,
-                    getIntent().getIntExtra(EXTRA_CACHE_MODE, ItemManager.MODE_DEFAULT),
+                    mCacheMode,
                     new ItemResponseListener(this));
         }
         if (!AppUtils.hasConnection(this)) {
@@ -251,6 +259,7 @@ public class ItemActivity extends InjectableActivity implements ItemFragment.Ite
         outState.putParcelable(STATE_ITEM, mItem);
         outState.putString(STATE_ITEM_ID, mItemId);
         outState.putBoolean(STATE_FULLSCREEN, mFullscreen);
+        outState.putString(STATE_SYNCED_OPENED_ITEM_ID, mSyncedOpenedItemId);
     }
 
     @Override
@@ -373,6 +382,7 @@ public class ItemActivity extends InjectableActivity implements ItemFragment.Ite
         mCustomTabsDelegate.mayLaunchUrl(Uri.parse(story.getUrl()), null, null);
         bindFavorite();
         mSessionManager.view(story.getId());
+        scheduleOpenedItemSync(story);
         mVoteButton.setVisibility(View.VISIBLE);
         mVoteButton.setOnClickListener(v -> vote(story));
         final TextView titleTextView = findViewById(android.R.id.text2);
@@ -412,7 +422,7 @@ public class ItemActivity extends InjectableActivity implements ItemFragment.Ite
                 new ItemPagerAdapter.Builder()
                         .setItem(story)
                         .setShowArticle(hasText || !mExternalBrowser)
-                        .setCacheMode(getIntent().getIntExtra(EXTRA_CACHE_MODE, ItemManager.MODE_DEFAULT))
+                        .setCacheMode(mCacheMode)
                         .setRetainInstance(true)
                         .setDefaultViewMode(mStoryViewMode));
         mAdapter.bind(mViewPager, mTabLayout, mNavButton, mReplyButton);
@@ -432,6 +442,16 @@ public class ItemActivity extends InjectableActivity implements ItemFragment.Ite
         if (mFullscreen) {
             setFullscreen();
         }
+    }
+
+    private void scheduleOpenedItemSync(@NonNull WebItem story) {
+        String itemId = story.getId();
+        if (!story.isStoryType() || TextUtils.isEmpty(itemId) ||
+                TextUtils.equals(mSyncedOpenedItemId, itemId)) {
+            return;
+        }
+        mSyncedOpenedItemId = itemId;
+        mSyncScheduler.scheduleSync(this, itemId);
     }
 
     private void decorateFavorite(boolean isFavorite) {

@@ -106,6 +106,7 @@ public class ItemFragment extends LazyLoadFragment implements Scrollable, Naviga
             }
             mItemId = item != null ? item.getId() : null;
         }
+        mCacheMode = AppUtils.cacheModeForConnection(requireContext(), mCacheMode);
     }
 
     @Override
@@ -124,7 +125,7 @@ public class ItemFragment extends LazyLoadFragment implements Scrollable, Naviga
                 if (TextUtils.isEmpty(mItemId)) {
                     return;
                 }
-                mCacheMode = ItemManager.MODE_NETWORK;
+                mCacheMode = AppUtils.cacheModeForConnection(requireContext(), ItemManager.MODE_NETWORK);
                 if (mAdapter != null) {
                     mAdapter.setCacheMode(mCacheMode);
                 }

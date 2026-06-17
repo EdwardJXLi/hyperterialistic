@@ -105,6 +105,20 @@
     <string name="offline_data_wifi" translatable="false">wifi</string>
     <string name="offline_data_default" translatable="false">default</string>
 
+    <!-- Hot cache -->
+    <string-array name="pref_hot_cache_count_options">
+        <item>@string/hot_cache_count_10</item>
+        <item>@string/hot_cache_count_20</item>
+        <item>@string/hot_cache_count_30</item>
+        <item>@string/hot_cache_count_50</item>
+    </string-array>
+    <string-array name="pref_hot_cache_count_values" translatable="false">
+        <item>10</item>
+        <item>20</item>
+        <item>30</item>
+        <item>50</item>
+    </string-array>
+
 
     <!-- Launch screen -->
     <string-array name="pref_launch_screen_options">

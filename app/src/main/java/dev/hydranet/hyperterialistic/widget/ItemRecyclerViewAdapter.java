@@ -21,20 +21,26 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.res.TypedArray;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import androidx.annotation.CallSuper;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 import android.text.TextUtils;
 import android.text.method.LinkMovementMethod;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import java.lang.ref.WeakReference;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import javax.inject.Inject;
 
@@ -49,6 +55,7 @@ import dev.hydranet.hyperterialistic.accounts.UserServices;
 import dev.hydranet.hyperterialistic.annotation.Synthetic;
 import dev.hydranet.hyperterialistic.data.Item;
 import dev.hydranet.hyperterialistic.data.ItemManager;
+import dev.hydranet.hyperterialistic.data.OfflineItemCache;
 import dev.hydranet.hyperterialistic.data.ResponseListener;
 
 public abstract class ItemRecyclerViewAdapter<VH extends ItemRecyclerViewAdapter.ItemViewHolder>
@@ -60,6 +67,9 @@ public abstract class ItemRecyclerViewAdapter<VH extends ItemRecyclerViewAdapter
     @Inject UserServices mUserServices;
     @Inject PopupMenu mPopupMenu;
     @Inject AlertDialogBuilder mAlertDialogBuilder;
+    @Inject OfflineItemCache mOfflineItemCache;
+    private final ExecutorService mCacheStatusExecutor = Executors.newSingleThreadExecutor();
+    private final Handler mHandler = new Handler(Looper.getMainLooper());
     private int mTertiaryTextColorResId;
     private int mSecondaryTextColorResId;
     private int mCardBackgroundColorResId;
@@ -96,6 +106,12 @@ public abstract class ItemRecyclerViewAdapter<VH extends ItemRecyclerViewAdapter
         mCardBackgroundColorResId = ta.getInt(2, 0);
         mCardHighlightColorResId = ta.getInt(3, 0);
         ta.recycle();
+    }
+
+    @Override
+    public void detach(Context context, RecyclerView recyclerView) {
+        super.detach(context, recyclerView);
+        mCacheStatusExecutor.shutdownNow();
     }
 
     @Override
@@ -167,6 +183,7 @@ public abstract class ItemRecyclerViewAdapter<VH extends ItemRecyclerViewAdapter
             });
         }
         bindActions(holder, item);
+        bindCacheStatus(holder, item);
     }
 
     protected void clear(VH holder) {
@@ -175,6 +192,28 @@ public abstract class ItemRecyclerViewAdapter<VH extends ItemRecyclerViewAdapter
         holder.mPostedTextView.setText(R.string.loading_text);
         holder.mContentTextView.setText(R.string.loading_text);
         holder.mReadMoreTextView.setVisibility(View.GONE);
+        holder.hideCacheStatus();
+    }
+
+    private void bindCacheStatus(final VH holder, final Item item) {
+        if (holder.mCacheStatusView == null) {
+            return;
+        }
+        final String itemId = item.getId();
+        holder.mCacheStatusView.setTag(itemId);
+        holder.setCached(false);
+        if (mCacheStatusExecutor.isShutdown()) {
+            return;
+        }
+        mCacheStatusExecutor.execute(() -> {
+            final boolean cached = mOfflineItemCache != null &&
+                    mOfflineItemCache.isItemCached(itemId);
+            mHandler.post(() -> {
+                if (TextUtils.equals(itemId, String.valueOf(holder.mCacheStatusView.getTag()))) {
+                    holder.setCached(cached);
+                }
+            });
+        });
     }
 
     @Synthetic
@@ -279,6 +318,7 @@ public abstract class ItemRecyclerViewAdapter<VH extends ItemRecyclerViewAdapter
         TextView mReadMoreTextView;
         TextView mCommentButton;
         View mMoreButton;
+        ImageView mCacheStatusView;
         View mContentView;
 
         ItemViewHolder(View itemView) {
@@ -290,6 +330,7 @@ public abstract class ItemRecyclerViewAdapter<VH extends ItemRecyclerViewAdapter
             mCommentButton = (TextView) itemView.findViewById(R.id.comment);
             mCommentButton.setVisibility(View.GONE);
             mMoreButton = itemView.findViewById(R.id.button_more);
+            mCacheStatusView = (ImageView) itemView.findViewById(R.id.cache_status);
             mContentView = itemView.findViewById(R.id.content);
         }
 
@@ -300,6 +341,26 @@ public abstract class ItemRecyclerViewAdapter<VH extends ItemRecyclerViewAdapter
 
         boolean isFooter() {
             return mIsFooter;
+        }
+
+        void setCached(boolean cached) {
+            if (mCacheStatusView != null) {
+                mCacheStatusView.setVisibility(cached ? View.VISIBLE : View.GONE);
+                if (cached) {
+                    mCacheStatusView.setImageResource(R.drawable.ic_done_white_24dp);
+                    mCacheStatusView.setColorFilter(ContextCompat.getColor(itemView.getContext(),
+                            R.color.greenA700));
+                    mCacheStatusView.setAlpha(1.0f);
+                    mCacheStatusView.setContentDescription(itemView.getContext()
+                            .getString(R.string.cached));
+                }
+            }
+        }
+
+        void hideCacheStatus() {
+            if (mCacheStatusView != null) {
+                mCacheStatusView.setVisibility(View.GONE);
+            }
         }
     }
 

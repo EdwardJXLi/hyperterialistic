@@ -17,18 +17,22 @@
 package dev.hydranet.hyperterialistic;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Typeface;
 import android.os.StrictMode;
 import androidx.appcompat.app.AppCompatDelegate;
+import androidx.preference.PreferenceManager;
 
 import dagger.ObjectGraph;
 import dev.hydranet.hyperterialistic.data.AlgoliaClient;
+import dev.hydranet.hyperterialistic.data.SyncScheduler;
 import rx.schedulers.Schedulers;
 
 public class Application extends android.app.Application implements Injectable {
 
     public static Typeface TYPE_FACE = null;
     private ObjectGraph mApplicationGraph;
+    private SharedPreferences.OnSharedPreferenceChangeListener mPreferenceChangeListener;
 
     @Override
     protected void attachBaseContext(Context base) {
@@ -55,6 +59,21 @@ public class Application extends android.app.Application implements Injectable {
         TYPE_FACE = FontCache.getInstance().get(this, Preferences.Theme.getTypeface(this));
         AppUtils.registerAccountsUpdatedListener(this);
         AdBlocker.init(this, Schedulers.io());
+        SyncScheduler.scheduleHotCache(this);
+        mPreferenceChangeListener = (sharedPreferences, key) -> {
+            if (key == null ||
+                    key.equals(getString(R.string.pref_hot_cache)) ||
+                    key.equals(getString(R.string.pref_hot_cache_count)) ||
+                    key.equals(getString(R.string.pref_hot_cache_frequency)) ||
+                    key.equals(getString(R.string.pref_offline_comments)) ||
+                    key.equals(getString(R.string.pref_offline_article)) ||
+                    key.equals(getString(R.string.pref_offline_readability)) ||
+                    key.equals(getString(R.string.pref_offline_data))) {
+                SyncScheduler.scheduleHotCache(this);
+            }
+        };
+        PreferenceManager.getDefaultSharedPreferences(this)
+                .registerOnSharedPreferenceChangeListener(mPreferenceChangeListener);
     }
 
     @Override

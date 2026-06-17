@@ -23,6 +23,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.collection.ArrayMap;
@@ -42,6 +44,8 @@ import android.widget.Toast;
 
 import java.lang.ref.WeakReference;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -58,6 +62,7 @@ import dev.hydranet.hyperterialistic.data.FavoriteManager;
 import dev.hydranet.hyperterialistic.data.Item;
 import dev.hydranet.hyperterialistic.data.ItemManager;
 import dev.hydranet.hyperterialistic.data.MaterialisticDatabase;
+import dev.hydranet.hyperterialistic.data.OfflineItemCache;
 import dev.hydranet.hyperterialistic.data.ResponseListener;
 import dev.hydranet.hyperterialistic.data.SessionManager;
 
@@ -97,6 +102,9 @@ public class StoryRecyclerViewAdapter extends
     };
     @Inject @Named(ActivityModule.HN) ItemManager mItemManager;
     @Inject SessionManager mSessionManager;
+    @Inject OfflineItemCache mOfflineItemCache;
+    private final ExecutorService mCacheStatusExecutor = Executors.newSingleThreadExecutor();
+    private final Handler mHandler = new Handler(Looper.getMainLooper());
     @Synthetic final SortedList<Item> mItems = new SortedList<>(Item.class, mSortedListCallback);
     @Synthetic final ArraySet<Item> mAdded = new ArraySet<>();
     @Synthetic final ArrayMap<String, Integer> mPromoted = new ArrayMap<>();
@@ -228,6 +236,7 @@ public class StoryRecyclerViewAdapter extends
         MaterialisticDatabase.getInstance(recyclerView.getContext()).getLiveData().removeObserver(mObserver);
         mItemTouchHelper.attachToRecyclerView(null);
         mPrefObservable.unsubscribe(recyclerView.getContext());
+        mCacheStatusExecutor.shutdownNow();
     }
 
     @Override
@@ -342,7 +351,28 @@ public class StoryRecyclerViewAdapter extends
             story.setFavorite(false);
         }
         holder.setFavorite(story.isFavorite());
+        bindCacheStatus(holder, story);
         holder.bindMoreOptions(anchor -> showMoreOptions(anchor, story, holder), true);
+    }
+
+    private void bindCacheStatus(final ItemViewHolder holder, final Item story) {
+        final String itemId = story.getId();
+        holder.itemView.setTag(R.id.cache_status, itemId);
+        holder.setCacheStatus(OfflineItemCache.CACHE_NONE);
+        if (mCacheStatusExecutor.isShutdown()) {
+            return;
+        }
+        mCacheStatusExecutor.execute(() -> {
+            final int cacheStatus = mOfflineItemCache != null ?
+                    mOfflineItemCache.getStoryCacheStatus(itemId) :
+                    OfflineItemCache.CACHE_NONE;
+            mHandler.post(() -> {
+                Object boundId = holder.itemView.getTag(R.id.cache_status);
+                if (TextUtils.equals(itemId, String.valueOf(boundId))) {
+                    holder.setCacheStatus(cacheStatus);
+                }
+            });
+        });
     }
 
     @Override
@@ -559,15 +589,25 @@ public class StoryRecyclerViewAdapter extends
 
         @Override
         public void onResponse(@Nullable Item response) {
-            if (mAdapter.get() != null && mAdapter.get().isAttached() && response != null) {
+            if (mAdapter.get() == null || !mAdapter.get().isAttached()) {
+                return;
+            }
+            if (response != null) {
                 mPartialItem.populate(response);
                 mAdapter.get().onItemLoaded(mPartialItem);
+            } else {
+                onError(null);
             }
         }
 
         @Override
         public void onError(String errorMessage) {
-            // do nothing
+            StoryRecyclerViewAdapter adapter = mAdapter.get();
+            if (adapter == null || !adapter.isAttached()) {
+                return;
+            }
+            mPartialItem.setLocalRevision(-1);
+            adapter.onItemLoaded(mPartialItem);
         }
     }
 

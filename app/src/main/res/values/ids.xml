@@ -38,6 +38,7 @@
     <item type="id" name="score" />
     <item type="id" name="level" />
     <item type="id" name="story_view" />
+    <item type="id" name="cache_status" />
     <item type="id" name="parent" />
 
     <!-- drawer -->

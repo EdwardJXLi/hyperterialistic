@@ -24,6 +24,7 @@ import javax.inject.Singleton;
 import dagger.Module;
 import dagger.Provides;
 import dev.hydranet.hyperterialistic.appwidget.WidgetService;
+import dev.hydranet.hyperterialistic.data.HotCacheJobService;
 import dev.hydranet.hyperterialistic.data.ItemSyncJobService;
 import dev.hydranet.hyperterialistic.data.ItemSyncService;
 
@@ -31,7 +32,8 @@ import dev.hydranet.hyperterialistic.data.ItemSyncService;
         injects = {
                 ItemSyncService.class,
                 WidgetService.class,
-                ItemSyncJobService.class
+                ItemSyncJobService.class,
+                HotCacheJobService.class
         },
         library = true,
         includes = DataModule.class

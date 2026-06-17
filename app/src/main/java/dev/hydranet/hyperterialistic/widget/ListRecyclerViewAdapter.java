@@ -286,6 +286,14 @@ public abstract class ListRecyclerViewAdapter
             mStoryView.setFavorite(favorite);
         }
 
+        public void setCached(boolean cached) {
+            mStoryView.setCached(cached);
+        }
+
+        public void setCacheStatus(int status) {
+            mStoryView.setCacheStatus(status);
+        }
+
         public void setUpdated(Item story, boolean updated, int change) {
             mStoryView.setUpdated(story, updated, change);
         }
