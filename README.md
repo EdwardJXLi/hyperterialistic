@@ -1,5 +1,12 @@
 ## Hyperterialistic for Hacker News
-Material design [Hacker News] client for Android, uses official [HackerNews/API], [Dagger] for dependency injection.
+Material design [Hacker News] client for Android with stronger offline reading support. It uses the official [HackerNews/API] and [Dagger] for dependency injection.
+
+### What's Different
+Hyperterialistic focuses on making Hacker News usable when connectivity is unreliable, with an offline-first layer for story lists, story metadata, comment trees, article pages, and readability text.
+
+- **On-demand caching** for stories you open or save, including comments, linked articles, and readability content.
+- **Hot cache** prefetching for top and best stories, with configurable size, refresh interval, connection policy, and progress notifications.
+- **Offline-aware UI** that falls back to cached data, shows full/partial cache status, and includes cache stats, refresh, clear, and cleanup controls.
 
 ### Setup
 **Requirements**
