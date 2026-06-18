@@ -43,11 +43,16 @@ jobs:
       - name: Build and verify debug APK
         run: ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 
+      - name: Stage debug APK
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk dist/hyperterialistic-debug-latest.apk
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: hyperterialistic-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: dist/hyperterialistic-debug-latest.apk
           if-no-files-found: error
 
   release:
@@ -98,9 +103,51 @@ jobs:
         run: |
           "$ANDROID_HOME/build-tools/36.1.0/apksigner" verify --verbose app/build/outputs/apk/release/app-release.apk
 
+      - name: Stage release APK
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk dist/hyperterialistic-release-latest.apk
+
       - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
           name: hyperterialistic-release-apk
-          path: app/build/outputs/apk/release/app-release.apk
+          path: dist/hyperterialistic-release-latest.apk
           if-no-files-found: error
+
+  publish-latest:
+    name: Publish Latest APK Release
+    runs-on: ubuntu-24.04
+    needs: [debug, release]
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: write
+    concurrency:
+      group: latest-apk-release
+      cancel-in-progress: false
+
+    steps:
+      - name: Download debug APK
+        uses: actions/download-artifact@v4
+        with:
+          name: hyperterialistic-debug-apk
+          path: dist
+
+      - name: Download release APK
+        uses: actions/download-artifact@v4
+        with:
+          name: hyperterialistic-release-apk
+          path: dist
+
+      - name: Publish latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
+          gh api --method DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/latest" || true
+          gh release create latest dist/*.apk \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Latest Build" \
+            --notes "Installable debug and signed release APKs for $GITHUB_SHA." \
+            --latest
