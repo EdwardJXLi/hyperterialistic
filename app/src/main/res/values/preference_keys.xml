@@ -42,6 +42,7 @@
     <string translatable="false" name="pref_offline_article">pref_offline_article</string>
     <string translatable="false" name="pref_offline_readability">pref_offline_readability</string>
     <string translatable="false" name="pref_offline_notification">pref_offline_notification</string>
+    <string translatable="false" name="pref_offline_notification_warning">pref_offline_notification_warning</string>
     <string translatable="false" name="pref_offline_cache_stats">pref_offline_cache_stats</string>
     <string translatable="false" name="pref_refresh_offline_cache">pref_refresh_offline_cache</string>
     <string translatable="false" name="pref_clear_offline_cache">pref_clear_offline_cache</string>

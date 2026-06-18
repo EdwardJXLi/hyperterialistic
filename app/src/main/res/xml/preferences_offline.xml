@@ -58,6 +58,13 @@
         android:summary="@string/pref_offline_notification_summary"
         android:defaultValue="false" />
 
+    <Preference
+        app:iconSpaceReserved="false"
+        android:key="@string/pref_offline_notification_warning"
+        android:title="@string/pref_offline_notification_warning_title"
+        android:summary="@string/pref_offline_notification_warning_summary"
+        app:isPreferenceVisible="false" />
+
     <dev.hydranet.hyperterialistic.preference.SimpleSpinnerPreference
         android:key="@string/pref_offline_data"
         android:title="@string/pref_offline_data_title"

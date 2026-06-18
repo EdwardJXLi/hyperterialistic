@@ -97,6 +97,8 @@
     <string name="pref_offline_data_always">Always</string>
     <string name="pref_offline_notification_title">Display progress</string>
     <string name="pref_offline_notification_summary">Show notification for download progress</string>
+    <string name="pref_offline_notification_warning_title">Notifications are disabled</string>
+    <string name="pref_offline_notification_warning_summary">Tap to enable notifications for offline download progress</string>
     <string name="pref_offline_cache_stats_title">Offline cache</string>
     <string name="pref_refresh_offline_cache_title">Refresh offline cache</string>
     <string name="pref_refresh_offline_cache_summary">Start a hot cache refresh now</string>

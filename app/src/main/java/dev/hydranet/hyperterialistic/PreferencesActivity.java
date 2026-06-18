@@ -17,13 +17,19 @@
 package dev.hydranet.hyperterialistic;
 
 import android.Manifest;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.Settings;
 import android.content.Context;
 import androidx.annotation.NonNull;
+import androidx.core.app.NotificationManagerCompat;
 import androidx.fragment.app.Fragment;
 import androidx.appcompat.app.ActionBar;
 import androidx.preference.PreferenceFragmentCompat;
@@ -93,6 +99,7 @@ public class PreferencesActivity extends ThemedActivity {
     }
 
     public static class SettingsFragment extends PreferenceFragmentCompat {
+        private static final String DOWNLOADS_CHANNEL_ID = "downloads";
         private static final int REQUEST_POST_NOTIFICATIONS = 1;
         private final Handler mHandler = new Handler(Looper.getMainLooper());
 
@@ -118,6 +125,15 @@ public class PreferencesActivity extends ThemedActivity {
                     if (Boolean.TRUE.equals(newValue)) {
                         requestNotificationPermissionIfNeeded();
                     }
+                    updateNotificationWarning();
+                    return true;
+                });
+            }
+            Preference notificationWarning =
+                    findPreference(getString(R.string.pref_offline_notification_warning));
+            if (notificationWarning != null) {
+                notificationWarning.setOnPreferenceClickListener(preference -> {
+                    enableNotifications();
                     return true;
                 });
             }
@@ -136,6 +152,7 @@ public class PreferencesActivity extends ThemedActivity {
                 });
             }
             updateOfflineCacheStats();
+            updateNotificationWarning();
         }
 
         private void requestNotificationPermissionIfNeeded() {
@@ -149,6 +166,82 @@ public class PreferencesActivity extends ThemedActivity {
                     REQUEST_POST_NOTIFICATIONS);
         }
 
+        private void enableNotifications() {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                    ContextCompat.checkSelfPermission(requireContext(),
+                            Manifest.permission.POST_NOTIFICATIONS) !=
+                            PackageManager.PERMISSION_GRANTED) {
+                requestNotificationPermissionIfNeeded();
+                return;
+            }
+            openNotificationSettings();
+        }
+
+        private void openNotificationSettings() {
+            Intent intent;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                intent = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, requireContext().getPackageName());
+                if (isDownloadsChannelDisabled()) {
+                    intent.putExtra(Settings.EXTRA_CHANNEL_ID, DOWNLOADS_CHANNEL_ID);
+                }
+            } else {
+                intent = getApplicationDetailsSettingsIntent();
+            }
+            if (intent.resolveActivity(requireContext().getPackageManager()) == null) {
+                intent = getApplicationDetailsSettingsIntent();
+            }
+            startActivity(intent);
+        }
+
+        private Intent getApplicationDetailsSettingsIntent() {
+            return new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                    .setData(Uri.parse("package:" + requireContext().getPackageName()));
+        }
+
+        private void updateNotificationWarning() {
+            Preference notificationWarning =
+                    findPreference(getString(R.string.pref_offline_notification_warning));
+            if (notificationWarning != null) {
+                notificationWarning.setVisible(!canPostDownloadNotifications());
+            }
+        }
+
+        private boolean canPostDownloadNotifications() {
+            Context context = requireContext();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                    ContextCompat.checkSelfPermission(context,
+                            Manifest.permission.POST_NOTIFICATIONS) !=
+                            PackageManager.PERMISSION_GRANTED) {
+                return false;
+            }
+            if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+                return false;
+            }
+            return Build.VERSION.SDK_INT < Build.VERSION_CODES.O || !isDownloadsChannelDisabled();
+        }
+
+        private boolean isDownloadsChannelDisabled() {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+                return false;
+            }
+            NotificationManager notificationManager =
+                    (NotificationManager) requireContext()
+                            .getSystemService(Context.NOTIFICATION_SERVICE);
+            NotificationChannel channel =
+                    notificationManager.getNotificationChannel(DOWNLOADS_CHANNEL_ID);
+            return channel != null &&
+                    channel.getImportance() == NotificationManager.IMPORTANCE_NONE;
+        }
+
+        @Override
+        public void onResume() {
+            super.onResume();
+            if (getArguments().getInt(EXTRA_PREFERENCES) == R.xml.preferences_offline) {
+                updateNotificationWarning();
+            }
+        }
+
         @Override
         public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
                                                @NonNull int[] grantResults) {
@@ -158,6 +251,7 @@ public class PreferencesActivity extends ThemedActivity {
             }
             if (grantResults.length > 0 &&
                     grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                updateNotificationWarning();
                 return;
             }
             TwoStatePreference progressNotification =
@@ -165,6 +259,7 @@ public class PreferencesActivity extends ThemedActivity {
             if (progressNotification != null) {
                 progressNotification.setChecked(false);
             }
+            updateNotificationWarning();
         }
 
         private void refreshOfflineCache() {
