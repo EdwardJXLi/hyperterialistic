@@ -1,5 +1,11 @@
 apply plugin: 'com.android.application'
 
+def releaseKeystoreFile = System.getenv("HYPERTERIALISTIC_KEYSTORE_FILE")
+def releaseKeystorePassword = System.getenv("HYPERTERIALISTIC_KEYSTORE_PASSWORD")
+def releaseKeyAlias = System.getenv("HYPERTERIALISTIC_KEY_ALIAS")
+def releaseKeyPassword = System.getenv("HYPERTERIALISTIC_KEY_PASSWORD")
+def hasReleaseSigning = releaseKeystoreFile && releaseKeystorePassword && releaseKeyAlias && releaseKeyPassword
+
 android {
     compileSdk {
         version = release(36) {
@@ -24,11 +30,25 @@ android {
         resConfigs 'en', 'zh-rCN', 'es'
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile = file(releaseKeystoreFile)
+                storePassword = releaseKeystorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         debug {
             minifyEnabled = false
         }
         release {
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled = true
             shrinkResources = true
         }

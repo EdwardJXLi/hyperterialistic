@@ -29,3 +29,9 @@ proguard/
 *.iml
 
 .DS_Store
+
+*.jks
+*.jks.base64
+*.keystore
+*.keystore.base64
+signing/

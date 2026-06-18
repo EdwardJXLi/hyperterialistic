@@ -3,6 +3,8 @@ name: Android CI
 on:
   push:
     branches: [main, master]
+    tags:
+      - 'v*'
   pull_request:
     branches: [main, master]
   workflow_dispatch:
@@ -15,8 +17,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Test, Lint, And Build
+  debug:
+    name: Test, Lint, And Build Debug APK
     runs-on: ubuntu-24.04
 
     steps:
@@ -46,4 +48,59 @@ jobs:
         with:
           name: hyperterialistic-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+  release:
+    name: Build Signed Release APK
+    runs-on: ubuntu-24.04
+    needs: debug
+    if: github.event_name != 'pull_request'
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-36.1" "build-tools;36.1.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Decode release keystore
+        env:
+          HYPERTERIALISTIC_KEYSTORE_BASE64: ${{ secrets.HYPERTERIALISTIC_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$HYPERTERIALISTIC_KEYSTORE_BASE64"
+          printf '%s' "$HYPERTERIALISTIC_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/hyperterialistic-release.jks"
+
+      - name: Build signed release APK
+        env:
+          HYPERTERIALISTIC_KEYSTORE_FILE: ${{ runner.temp }}/hyperterialistic-release.jks
+          HYPERTERIALISTIC_KEYSTORE_PASSWORD: ${{ secrets.HYPERTERIALISTIC_KEYSTORE_PASSWORD }}
+          HYPERTERIALISTIC_KEY_ALIAS: ${{ secrets.HYPERTERIALISTIC_KEY_ALIAS }}
+          HYPERTERIALISTIC_KEY_PASSWORD: ${{ secrets.HYPERTERIALISTIC_KEY_PASSWORD }}
+        run: |
+          test -n "$HYPERTERIALISTIC_KEYSTORE_PASSWORD"
+          test -n "$HYPERTERIALISTIC_KEY_ALIAS"
+          test -n "$HYPERTERIALISTIC_KEY_PASSWORD"
+          ./gradlew --no-daemon :app:assembleRelease
+
+      - name: Verify signed release APK
+        run: |
+          "$ANDROID_HOME/build-tools/36.1.0/apksigner" verify --verbose app/build/outputs/apk/release/app-release.apk
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: hyperterialistic-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
