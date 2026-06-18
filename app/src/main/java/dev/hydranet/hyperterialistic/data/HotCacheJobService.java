@@ -24,6 +24,8 @@ import android.app.job.JobParameters;
 import android.app.job.JobService;
 import android.content.pm.PackageManager;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.Process;
 import android.text.TextUtils;
 
@@ -36,6 +38,7 @@ import java.util.concurrent.TimeUnit;
 import javax.inject.Inject;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.WorkerThread;
 import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
 import dev.hydranet.hyperterialistic.ActivityModule;
@@ -118,8 +121,10 @@ public class HotCacheJobService extends JobService {
             if (Thread.currentThread().isInterrupted()) {
                 return false;
             }
-            if (!isCached(service, String.valueOf(id))) {
-                syncStory(String.valueOf(id));
+            String storyId = String.valueOf(id);
+            boolean cached = isCached(service, storyId);
+            if (!cached) {
+                syncStory(storyId);
             }
             downloaded++;
             updateProgress(downloaded, total, false);
@@ -127,6 +132,7 @@ public class HotCacheJobService extends JobService {
         return !Thread.currentThread().isInterrupted();
     }
 
+    @WorkerThread
     private boolean isCached(@NonNull HackerNewsClient.RestService service, @NonNull String id) {
         HackerNewsItem item = cachedItem(service, id);
         if (item == null) {
@@ -165,17 +171,26 @@ public class HotCacheJobService extends JobService {
 
     private void syncStory(@NonNull String id) {
         CountDownLatch latch = new CountDownLatch(1);
-        SyncDelegate syncDelegate = new SyncDelegate(this, mFactory, mReadabilityClient);
-        syncDelegate.subscribe(token -> latch.countDown());
-        syncDelegate.performSync(new SyncDelegate.JobBuilder(this, id)
-                .setNotificationEnabled(false)
-                .build());
+        final SyncDelegate[] syncDelegate = new SyncDelegate[1];
+        new Handler(Looper.getMainLooper()).post(() -> {
+            syncDelegate[0] = new SyncDelegate(this, mFactory, mReadabilityClient);
+            syncDelegate[0].subscribe(token -> latch.countDown());
+            syncDelegate[0].performSync(new SyncDelegate.JobBuilder(this, id)
+                    .setNotificationEnabled(false)
+                    .build());
+        });
         try {
             if (!latch.await(10, TimeUnit.MINUTES)) {
-                syncDelegate.stopSync();
+                stopSync(syncDelegate[0]);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            stopSync(syncDelegate[0]);
+        }
+    }
+
+    private void stopSync(SyncDelegate syncDelegate) {
+        if (syncDelegate != null) {
             syncDelegate.stopSync();
         }
     }
