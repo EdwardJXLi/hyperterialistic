@@ -129,17 +129,17 @@ public class OfflineCacheManager {
         for (String url : retainedUrls) {
             retainedArchiveNames.add(CacheableWebView.getArchiveFile(mContext, url).getName());
         }
-        deleteStaleWebArchives(dir, retainedArchiveNames);
+        deleteStaleWebArchiveFiles(dir, retainedArchiveNames);
     }
 
-    private void deleteStaleWebArchives(File dir, Set<String> retainedArchiveNames) {
+    private void deleteStaleWebArchiveFiles(File dir, Set<String> retainedArchiveNames) {
         File[] files = dir.listFiles();
         if (files == null) {
             return;
         }
         for (File file : files) {
             if (file.isDirectory()) {
-                deleteStaleWebArchives(file, retainedArchiveNames);
+                deleteStaleWebArchiveFiles(file, retainedArchiveNames);
             } else if (CacheableWebView.isArchiveFile(file) &&
                     !retainedArchiveNames.contains(file.getName())) {
                 //noinspection ResultOfMethodCallIgnored
