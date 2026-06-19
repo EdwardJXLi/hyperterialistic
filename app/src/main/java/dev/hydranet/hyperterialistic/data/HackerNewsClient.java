@@ -190,28 +190,34 @@ public class HackerNewsClient implements ItemManager, UserManager {
         Observable<int[]> observable;
         switch (filter) {
             case NEW_FETCH_MODE:
-                observable = cacheMode == MODE_NETWORK ?
-                        mRestService.networkNewStoriesRx() : mRestService.newStoriesRx();
+                observable = cacheMode == MODE_NETWORK ? mRestService.networkNewStoriesRx() :
+                        cacheMode == MODE_CACHE ? mRestService.cachedNewStoriesRx() :
+                                mRestService.newStoriesRx();
                 break;
             case SHOW_FETCH_MODE:
-                observable = cacheMode == MODE_NETWORK ?
-                        mRestService.networkShowStoriesRx() : mRestService.showStoriesRx();
+                observable = cacheMode == MODE_NETWORK ? mRestService.networkShowStoriesRx() :
+                        cacheMode == MODE_CACHE ? mRestService.cachedShowStoriesRx() :
+                                mRestService.showStoriesRx();
                 break;
             case ASK_FETCH_MODE:
-                observable = cacheMode == MODE_NETWORK ?
-                        mRestService.networkAskStoriesRx() : mRestService.askStoriesRx();
+                observable = cacheMode == MODE_NETWORK ? mRestService.networkAskStoriesRx() :
+                        cacheMode == MODE_CACHE ? mRestService.cachedAskStoriesRx() :
+                                mRestService.askStoriesRx();
                 break;
             case JOBS_FETCH_MODE:
-                observable = cacheMode == MODE_NETWORK ?
-                        mRestService.networkJobStoriesRx() : mRestService.jobStoriesRx();
+                observable = cacheMode == MODE_NETWORK ? mRestService.networkJobStoriesRx() :
+                        cacheMode == MODE_CACHE ? mRestService.cachedJobStoriesRx() :
+                                mRestService.jobStoriesRx();
                 break;
             case BEST_FETCH_MODE:
-                observable = cacheMode == MODE_NETWORK ?
-                        mRestService.networkBestStoriesRx() : mRestService.bestStoriesRx();
+                observable = cacheMode == MODE_NETWORK ? mRestService.networkBestStoriesRx() :
+                        cacheMode == MODE_CACHE ? mRestService.cachedBestStoriesRx() :
+                                mRestService.bestStoriesRx();
                 break;
             default:
-                observable = cacheMode == MODE_NETWORK ?
-                        mRestService.networkTopStoriesRx() : mRestService.topStoriesRx();
+                observable = cacheMode == MODE_NETWORK ? mRestService.networkTopStoriesRx() :
+                        cacheMode == MODE_CACHE ? mRestService.cachedTopStoriesRx() :
+                                mRestService.topStoriesRx();
                 break;
         }
         return observable.map(this::toItems);
@@ -231,33 +237,40 @@ public class HackerNewsClient implements ItemManager, UserManager {
         Call<int[]> call;
         if (filter == null) {
             // for legacy 'new stories' widgets
-            return cacheMode == MODE_NETWORK ?
-                    mRestService.networkNewStories() : mRestService.newStories();
+            return cacheMode == MODE_NETWORK ? mRestService.networkNewStories() :
+                    cacheMode == MODE_CACHE ? mRestService.cachedNewStories() :
+                            mRestService.newStories();
         }
         switch (filter) {
             case NEW_FETCH_MODE:
-                call = cacheMode == MODE_NETWORK ?
-                        mRestService.networkNewStories() : mRestService.newStories();
+                call = cacheMode == MODE_NETWORK ? mRestService.networkNewStories() :
+                        cacheMode == MODE_CACHE ? mRestService.cachedNewStories() :
+                                mRestService.newStories();
                 break;
             case SHOW_FETCH_MODE:
-                call = cacheMode == MODE_NETWORK ?
-                        mRestService.networkShowStories() : mRestService.showStories();
+                call = cacheMode == MODE_NETWORK ? mRestService.networkShowStories() :
+                        cacheMode == MODE_CACHE ? mRestService.cachedShowStories() :
+                                mRestService.showStories();
                 break;
             case ASK_FETCH_MODE:
-                call = cacheMode == MODE_NETWORK ?
-                        mRestService.networkAskStories() : mRestService.askStories();
+                call = cacheMode == MODE_NETWORK ? mRestService.networkAskStories() :
+                        cacheMode == MODE_CACHE ? mRestService.cachedAskStories() :
+                                mRestService.askStories();
                 break;
             case JOBS_FETCH_MODE:
-                call = cacheMode == MODE_NETWORK ?
-                        mRestService.networkJobStories() : mRestService.jobStories();
+                call = cacheMode == MODE_NETWORK ? mRestService.networkJobStories() :
+                        cacheMode == MODE_CACHE ? mRestService.cachedJobStories() :
+                                mRestService.jobStories();
                 break;
             case BEST_FETCH_MODE:
-                call = cacheMode == MODE_NETWORK ?
-                        mRestService.networkBestStories() : mRestService.bestStories();
+                call = cacheMode == MODE_NETWORK ? mRestService.networkBestStories() :
+                        cacheMode == MODE_CACHE ? mRestService.cachedBestStories() :
+                                mRestService.bestStories();
                 break;
             default:
-                call = cacheMode == MODE_NETWORK ?
-                        mRestService.networkTopStories() : mRestService.topStories();
+                call = cacheMode == MODE_NETWORK ? mRestService.networkTopStories() :
+                        cacheMode == MODE_CACHE ? mRestService.cachedTopStories() :
+                                mRestService.topStories();
                 break;
         }
         return call;
@@ -325,6 +338,30 @@ public class HackerNewsClient implements ItemManager, UserManager {
         @GET("beststories.json")
         Observable<int[]> networkBestStoriesRx();
 
+        @Headers(RestServiceFactory.CACHE_CONTROL_FORCE_CACHE)
+        @GET("topstories.json")
+        Observable<int[]> cachedTopStoriesRx();
+
+        @Headers(RestServiceFactory.CACHE_CONTROL_FORCE_CACHE)
+        @GET("newstories.json")
+        Observable<int[]> cachedNewStoriesRx();
+
+        @Headers(RestServiceFactory.CACHE_CONTROL_FORCE_CACHE)
+        @GET("showstories.json")
+        Observable<int[]> cachedShowStoriesRx();
+
+        @Headers(RestServiceFactory.CACHE_CONTROL_FORCE_CACHE)
+        @GET("askstories.json")
+        Observable<int[]> cachedAskStoriesRx();
+
+        @Headers(RestServiceFactory.CACHE_CONTROL_FORCE_CACHE)
+        @GET("jobstories.json")
+        Observable<int[]> cachedJobStoriesRx();
+
+        @Headers(RestServiceFactory.CACHE_CONTROL_FORCE_CACHE)
+        @GET("beststories.json")
+        Observable<int[]> cachedBestStoriesRx();
+
         @Headers(RestServiceFactory.CACHE_CONTROL_MAX_AGE_30M)
         @GET("item/{itemId}.json")
         Observable<HackerNewsItem> itemRx(@Path("itemId") String itemId);
@@ -387,6 +424,30 @@ public class HackerNewsClient implements ItemManager, UserManager {
         @Headers(RestServiceFactory.CACHE_CONTROL_FORCE_NETWORK)
         @GET("beststories.json")
         Call<int[]> networkBestStories();
+
+        @Headers(RestServiceFactory.CACHE_CONTROL_FORCE_CACHE)
+        @GET("topstories.json")
+        Call<int[]> cachedTopStories();
+
+        @Headers(RestServiceFactory.CACHE_CONTROL_FORCE_CACHE)
+        @GET("newstories.json")
+        Call<int[]> cachedNewStories();
+
+        @Headers(RestServiceFactory.CACHE_CONTROL_FORCE_CACHE)
+        @GET("showstories.json")
+        Call<int[]> cachedShowStories();
+
+        @Headers(RestServiceFactory.CACHE_CONTROL_FORCE_CACHE)
+        @GET("askstories.json")
+        Call<int[]> cachedAskStories();
+
+        @Headers(RestServiceFactory.CACHE_CONTROL_FORCE_CACHE)
+        @GET("jobstories.json")
+        Call<int[]> cachedJobStories();
+
+        @Headers(RestServiceFactory.CACHE_CONTROL_FORCE_CACHE)
+        @GET("beststories.json")
+        Call<int[]> cachedBestStories();
 
         @Headers(RestServiceFactory.CACHE_CONTROL_MAX_AGE_30M)
         @GET("item/{itemId}.json")
