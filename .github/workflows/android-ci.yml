@@ -151,3 +151,46 @@ jobs:
             --title "Latest Build" \
             --notes "Installable debug and signed release APKs for $GITHUB_SHA." \
             --latest
+
+  publish-apk-repository:
+    name: Publish to APK Repository
+    runs-on: ubuntu-24.04
+    needs: release
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+    concurrency:
+      group: apk-repository-${{ github.ref }}
+      cancel-in-progress: false
+
+    steps:
+      - name: Download APK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: hyperterialistic-release-apk
+          path: dist
+
+      - name: Upload release APK to APK Repository
+        env:
+          APK_REPOSITORY_URL: ${{ secrets.APK_REPOSITORY_URL }}
+          APK_REPOSITORY_API_KEY: ${{ secrets.APK_REPOSITORY_API_KEY }}
+        run: |
+          if [ -z "$APK_REPOSITORY_URL" ]; then
+            echo "::error::Missing APK_REPOSITORY_URL repository secret."
+            exit 1
+          fi
+          if [ -z "$APK_REPOSITORY_API_KEY" ]; then
+            echo "::error::Missing APK_REPOSITORY_API_KEY repository secret."
+            exit 1
+          fi
+          apk="$(find dist -name '*release*.apk' -print -quit)"
+          if [ -z "$apk" ]; then
+            echo "::error::No release APK found in downloaded artifacts."
+            exit 1
+          fi
+          base_url="${APK_REPOSITORY_URL%/}"
+          curl --fail-with-body \
+            -H "Authorization: Bearer ${APK_REPOSITORY_API_KEY}" \
+            -F "apk=@${apk};type=application/vnd.android.package-archive" \
+            -F 'metadata={"release_channel":"release"}' \
+            "${base_url}/api/v1/upload"
