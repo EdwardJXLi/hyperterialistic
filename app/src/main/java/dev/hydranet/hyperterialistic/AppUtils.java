@@ -315,6 +315,12 @@ public class AppUtils {
         return hasConnection(context) ? cacheMode : ItemManager.MODE_CACHE;
     }
 
+    @ItemManager.CacheMode
+    public static int cacheModeForReader(Context context, @ItemManager.CacheMode int cacheMode) {
+        return Preferences.isReaderOfflineModeEnabled(context) ?
+                ItemManager.MODE_CACHE : cacheModeForConnection(context, cacheMode);
+    }
+
     @SuppressLint("MissingPermission")
     public static Pair<String, String> getCredentials(Context context) {
         String username = Preferences.getUsername(context);

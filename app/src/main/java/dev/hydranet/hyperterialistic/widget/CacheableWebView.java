@@ -36,6 +36,7 @@ public class CacheableWebView extends WebView {
     private static final String CACHE_PREFIX = "webarchive-";
     private static final String CACHE_EXTENSION = ".mht";
     private ArchiveClient mArchiveClient = new ArchiveClient();
+    private boolean mForceCacheOnly;
 
     public CacheableWebView(Context context) {
         this(context, null);
@@ -98,8 +99,13 @@ public class CacheableWebView extends WebView {
     }
 
     private void setCacheModeInternal() {
-        getSettings().setCacheMode(AppUtils.hasConnection(getContext()) ?
-                WebSettings.LOAD_CACHE_ELSE_NETWORK : WebSettings.LOAD_CACHE_ONLY);
+        getSettings().setCacheMode(mForceCacheOnly || !AppUtils.hasConnection(getContext()) ?
+                WebSettings.LOAD_CACHE_ONLY : WebSettings.LOAD_CACHE_ELSE_NETWORK);
+    }
+
+    public void setForceCacheOnly(boolean forceCacheOnly) {
+        mForceCacheOnly = forceCacheOnly;
+        setCacheModeInternal();
     }
 
     @SuppressLint("SetJavaScriptEnabled")

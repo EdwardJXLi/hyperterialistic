@@ -150,7 +150,8 @@ public abstract class BaseListActivity extends DrawerActivity implements MultiPa
                 R.string.pref_navigation,
                 R.string.pref_external,
                 R.string.pref_story_display,
-                R.string.pref_multi_window);
+                R.string.pref_multi_window,
+                R.string.pref_reader_offline_mode);
     }
 
     @Override
@@ -206,6 +207,10 @@ public abstract class BaseListActivity extends DrawerActivity implements MultiPa
             menu.findItem(R.id.menu_share).setVisible(mSelectedItem != null);
             menu.findItem(R.id.menu_external).setVisible(mSelectedItem != null);
         }
+        MenuItem readerOffline = menu.findItem(R.id.menu_reader_offline);
+        if (readerOffline != null) {
+            readerOffline.setVisible(Preferences.isReaderOfflineModeEnabled(this));
+        }
         return isSearchable() || super.onPrepareOptionsMenu(menu);
     }
 
@@ -222,6 +227,9 @@ public abstract class BaseListActivity extends DrawerActivity implements MultiPa
             AppUtils.openExternal(this, mPopupMenu, anchor == null ?
                     findViewById(R.id.toolbar) : anchor,
                     mSelectedItem, mCustomTabsDelegate.getSession());
+            return true;
+        }
+        if (item.getItemId() == R.id.menu_reader_offline) {
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -458,6 +466,13 @@ public abstract class BaseListActivity extends DrawerActivity implements MultiPa
             }
         } else if (key == R.string.pref_multi_window) {
             mMultiWindowEnabled = Preferences.multiWindowEnabled(this);
+        } else if (key == R.string.pref_reader_offline_mode) {
+            supportInvalidateOptionsMenu();
+            onReaderOfflineModeChanged();
         }
+    }
+
+    protected void onReaderOfflineModeChanged() {
+        // no op
     }
 }

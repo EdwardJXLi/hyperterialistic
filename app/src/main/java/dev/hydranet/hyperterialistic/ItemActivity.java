@@ -145,7 +145,7 @@ public class ItemActivity extends InjectableActivity implements ItemFragment.Ite
         } else {
             mStoryViewMode = Preferences.getDefaultStoryView(this);
         }
-        mCacheMode = AppUtils.cacheModeForConnection(this,
+        mCacheMode = AppUtils.cacheModeForReader(this,
                 getIntent().getIntExtra(EXTRA_CACHE_MODE, ItemManager.MODE_DEFAULT));
         setContentView(R.layout.activity_item);
         setSupportActionBar(findViewById(R.id.toolbar));

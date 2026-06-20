@@ -17,6 +17,11 @@
 
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item android:id="@id/menu_reader_offline"
+        android:title="@string/reader_offline_mode"
+        android:icon="@drawable/ic_cloud_off_white_24dp"
+        android:visible="false"
+        app:showAsAction="always" />
     <item android:id="@id/menu_search"
         android:title="@string/search"
         android:menuCategory="secondary"

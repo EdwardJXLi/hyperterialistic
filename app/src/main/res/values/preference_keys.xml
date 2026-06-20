@@ -46,6 +46,7 @@
     <string translatable="false" name="pref_offline_cache_stats">pref_offline_cache_stats</string>
     <string translatable="false" name="pref_refresh_offline_cache">pref_refresh_offline_cache</string>
     <string translatable="false" name="pref_clear_offline_cache">pref_clear_offline_cache</string>
+    <string translatable="false" name="pref_reader_offline_mode">pref_reader_offline_mode</string>
     <string translatable="false" name="pref_line_height">pref_line_height</string>
     <string translatable="false" name="pref_list_item_view">pref_list_item_view</string>
     <string translatable="false" name="pref_max_lines">pref_max_lines</string>

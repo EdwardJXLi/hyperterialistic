@@ -145,6 +145,12 @@
         app:iconStart="@drawable/ic_add_white_24dp"
         style="@style/DrawerTextStyle"/>
 
+    <dev.hydranet.hyperterialistic.widget.TintableTextView
+        android:id="@id/drawer_reader_offline"
+        android:text="@string/reader_offline_mode"
+        app:iconStart="@drawable/ic_cloud_off_white_24dp"
+        style="@style/DrawerTextStyle"/>
+
     <View
         android:background="@color/blackT12"
         android:layout_width="match_parent"

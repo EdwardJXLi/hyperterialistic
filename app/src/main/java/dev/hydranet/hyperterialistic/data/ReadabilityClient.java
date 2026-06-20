@@ -43,6 +43,8 @@ public interface ReadabilityClient {
 
     void parse(String itemId, String url, Callback callback);
 
+    void parse(String itemId, String url, boolean networkAllowed, Callback callback);
+
     @WorkerThread
     void parse(String itemId, String url);
 
@@ -78,10 +80,16 @@ public interface ReadabilityClient {
 
         @Override
         public void parse(String itemId, String url, Callback callback) {
+            parse(itemId, url, true, callback);
+        }
+
+        @Override
+        public void parse(String itemId, String url, boolean networkAllowed, Callback callback) {
             Observable.defer(() -> fromCache(itemId))
                     .subscribeOn(mIoScheduler)
                     .flatMap(content -> content != null ?
-                            Observable.just(content) : fromNetwork(itemId, url))
+                            Observable.just(content) :
+                            networkAllowed ? fromNetwork(itemId, url) : Observable.just(null))
                     .map(content -> AndroidUtils.TextUtils.equals(EMPTY_CONTENT, content) ? null : content)
                     .observeOn(mMainThreadScheduler)
                     .subscribe(callback::onResponse);

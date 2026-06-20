@@ -243,6 +243,14 @@ public class Preferences {
         return get(context, R.string.pref_ad_block, true);
     }
 
+    public static boolean isReaderOfflineModeEnabled(Context context) {
+        return get(context, R.string.pref_reader_offline_mode, false);
+    }
+
+    public static void setReaderOfflineModeEnabled(Context context, boolean enabled) {
+        set(context, R.string.pref_reader_offline_mode, enabled);
+    }
+
     public static void saveDraft(Context context, String parentId, String draft) {
         context.getSharedPreferences(context.getPackageName() + PREFERENCES_DRAFT, Context.MODE_PRIVATE)
                 .edit()

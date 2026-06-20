@@ -50,10 +50,13 @@ public abstract class DrawerActivity extends InjectableActivity {
     private TextView mDrawerAccount;
     private View mDrawerLogout;
     private View mDrawerUser;
+    private TextView mDrawerReaderOffline;
     private final SharedPreferences.OnSharedPreferenceChangeListener mLoginListener
             = (sharedPreferences, key) -> {
         if (TextUtils.equals(key, getString(R.string.pref_username))) {
             setUsername();
+        } else if (TextUtils.equals(key, getString(R.string.pref_reader_offline_mode))) {
+            setReaderOfflineMode();
         }
     };
 
@@ -66,6 +69,7 @@ public abstract class DrawerActivity extends InjectableActivity {
         mDrawerAccount = (TextView) findViewById(R.id.drawer_account);
         mDrawerLogout = findViewById(R.id.drawer_logout);
         mDrawerUser = findViewById(R.id.drawer_user);
+        mDrawerReaderOffline = (TextView) findViewById(R.id.drawer_reader_offline);
         mDrawerToggle = new ActionBarDrawerToggle(this, mDrawerLayout, R.string.open_drawer,
                 R.string.close_drawer) {
             @Override
@@ -89,6 +93,7 @@ public abstract class DrawerActivity extends InjectableActivity {
                 .registerOnSharedPreferenceChangeListener(mLoginListener);
         setUpDrawer();
         setUsername();
+        setReaderOfflineMode();
     }
 
     @Override
@@ -170,6 +175,9 @@ public abstract class DrawerActivity extends InjectableActivity {
         findViewById(R.id.drawer_settings).setOnClickListener(v -> navigate(SettingsActivity.class));
         findViewById(R.id.drawer_favorite).setOnClickListener(v -> navigate(FavoriteActivity.class));
         findViewById(R.id.drawer_submit).setOnClickListener(v -> navigate(SubmitActivity.class));
+        mDrawerReaderOffline.setOnClickListener(v ->
+                Preferences.setReaderOfflineModeEnabled(this,
+                        !Preferences.isReaderOfflineModeEnabled(this)));
         findViewById(R.id.drawer_user).setOnClickListener(v -> {
             Bundle extras = new Bundle();
             extras.putString(UserActivity.EXTRA_USERNAME, Preferences.getUsername(this));
@@ -220,6 +228,15 @@ public abstract class DrawerActivity extends InjectableActivity {
             mDrawerLogout.setVisibility(View.GONE);
             mDrawerUser.setVisibility(View.GONE);
         }
+    }
+
+    private void setReaderOfflineMode() {
+        boolean enabled = Preferences.isReaderOfflineModeEnabled(this);
+        mDrawerReaderOffline.setCompoundDrawablesWithIntrinsicBounds(
+                ContextCompat.getDrawable(this, R.drawable.ic_cloud_off_white_24dp),
+                null,
+                enabled ? ContextCompat.getDrawable(this, R.drawable.ic_done_white_24dp) : null,
+                null);
     }
 
     private void closeDrawers() {

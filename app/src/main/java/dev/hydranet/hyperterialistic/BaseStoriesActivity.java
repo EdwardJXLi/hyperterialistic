@@ -58,7 +58,8 @@ public abstract class BaseStoriesActivity extends BaseListActivity
             if (getSupportActionBar() == null) {
                 return;
             }
-            if (AppUtils.hasConnection(BaseStoriesActivity.this)) {
+            if (AppUtils.hasConnection(BaseStoriesActivity.this) &&
+                    !Preferences.isReaderOfflineModeEnabled(BaseStoriesActivity.this)) {
                 getSupportActionBar().setSubtitle(getString(R.string.last_updated,
                         DateUtils.getRelativeTimeSpanString(mLastUpdated,
                                 System.currentTimeMillis(),
@@ -88,6 +89,12 @@ public abstract class BaseStoriesActivity extends BaseListActivity
                     new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION));
             mConnectivityReceiverRegistered = true;
         }
+        mHandler.removeCallbacks(mLastUpdateTask);
+        mHandler.post(mLastUpdateTask);
+    }
+
+    @Override
+    protected void onReaderOfflineModeChanged() {
         mHandler.removeCallbacks(mLastUpdateTask);
         mHandler.post(mLastUpdateTask);
     }

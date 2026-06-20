@@ -63,6 +63,7 @@
     <item type="id" name="drawer_release" />
     <item type="id" name="drawer_display" />
     <item type="id" name="drawer_offline" />
+    <item type="id" name="drawer_reader_offline" />
     <item type="id" name="drawer_more" />
 
     <!-- menu -->
@@ -71,6 +72,7 @@
     <item type="id" name="menu_clear" />
     <item type="id" name="menu_export" />
     <item type="id" name="menu_search" />
+    <item type="id" name="menu_reader_offline" />
     <item type="id" name="menu_clear_recent" />
     <item type="id" name="menu_reset" />
     <item type="id" name="menu_range" />

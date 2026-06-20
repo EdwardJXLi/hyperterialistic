@@ -109,6 +109,7 @@
     <string name="confirm_clear_offline_cache">Clear offline cache?</string>
     <string name="offline_cache_refresh_queued">Offline cache refresh queued</string>
     <string name="offline_cache_cleared">Offline cache cleared</string>
+    <string name="reader_offline_mode">Reader offline</string>
     <string name="pref_launch_screen_title">Default screen</string>
     <string name="pref_volume_title">Use volume navigation</string>
     <string name="pref_volume_summary">Scroll up/down with volume keys</string>

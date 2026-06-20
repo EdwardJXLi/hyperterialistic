@@ -69,7 +69,6 @@ import dev.hydranet.hyperterialistic.data.WebItem;
 import dev.hydranet.hyperterialistic.widget.AdBlockWebViewClient;
 import dev.hydranet.hyperterialistic.widget.CacheableWebView;
 import dev.hydranet.hyperterialistic.widget.PopupMenu;
-import dev.hydranet.hyperterialistic.widget.WebView;
 import okhttp3.Call;
 
 import static android.view.View.GONE;
@@ -87,7 +86,7 @@ public class WebFragment extends LazyLoadFragment
     private static final int DEFAULT_PROGRESS = 20;
     public static final String PDF_LOADER_URL = "file:///android_asset/pdf/index.html";
     private static final String PDF_MIME_TYPE = "application/pdf";
-    @Synthetic WebView mWebView;
+    @Synthetic CacheableWebView mWebView;
     private NestedScrollView mScrollView;
     @Synthetic boolean mExternalRequired = false;
     @Inject @Named(ActivityModule.HN) ItemManager mItemManager;
@@ -125,7 +124,8 @@ public class WebFragment extends LazyLoadFragment
         mPreferenceObservable.subscribe(context, this::onPreferenceChanged,
                 R.string.pref_readability_font,
                 R.string.pref_readability_line_height,
-                R.string.pref_readability_text_size);
+                R.string.pref_readability_text_size,
+                R.string.pref_reader_offline_mode);
         LocalBroadcastManager.getInstance(context).registerReceiver(mReceiver,
                 new IntentFilter(ACTION_FULLSCREEN));
     }
@@ -155,7 +155,7 @@ public class WebFragment extends LazyLoadFragment
             mScrollViewContent = (ViewGroup) mFragmentView.findViewById(R.id.scroll_view_content);
             mScrollView = (NestedScrollView) mFragmentView.findViewById(R.id.nested_scroll_view);
             mControls = (ViewSwitcher) mFragmentView.findViewById(R.id.control_switcher);
-            mWebView = (WebView) mFragmentView.findViewById(R.id.web_view);
+            mWebView = (CacheableWebView) mFragmentView.findViewById(R.id.web_view);
             mButtonRefresh = (ImageButton) mFragmentView.findViewById(R.id.button_refresh);
             mButtonMore = mFragmentView.findViewById(R.id.button_more);
             mButtonNext = mFragmentView.findViewById(R.id.button_next);
@@ -305,6 +305,7 @@ public class WebFragment extends LazyLoadFragment
 
     private void loadUrl() {
         setWebSettings(true);
+        mWebView.setForceCacheOnly(Preferences.isReaderOfflineModeEnabled(requireContext()));
         reloadUrl(mItem.getUrl());
     }
 
@@ -348,7 +349,9 @@ public class WebFragment extends LazyLoadFragment
 
     private void parse() {
         mProgressBar.setProgress(DEFAULT_PROGRESS);
-        mReadabilityClient.parse(mItem.getId(), mItem.getUrl(), new ReadabilityCallback(this));
+        mReadabilityClient.parse(mItem.getId(), mItem.getUrl(),
+                !Preferences.isReaderOfflineModeEnabled(requireContext()),
+                new ReadabilityCallback(this));
     }
 
     private void bindContent() {
@@ -357,7 +360,7 @@ public class WebFragment extends LazyLoadFragment
             loadContent();
         } else {
             mItemManager.getItem(mItem.getId(),
-                    AppUtils.cacheModeForConnection(requireContext(), ItemManager.MODE_DEFAULT),
+                    AppUtils.cacheModeForReader(requireContext(), ItemManager.MODE_DEFAULT),
                     new ItemResponseListener(this));
         }
     }
