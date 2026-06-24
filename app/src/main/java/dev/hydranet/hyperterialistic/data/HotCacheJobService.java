@@ -50,6 +50,10 @@ import dev.hydranet.hyperterialistic.R;
 public class HotCacheJobService extends JobService {
     private static final int NOTIFICATION_ID = Integer.MAX_VALUE - 2;
     private static final String DOWNLOADS_CHANNEL_ID = "downloads";
+    // Fraction of story bodies that must actually be cached before we advance the offline
+    // story list and garbage collect the previous one. Keeps a spotty connection from
+    // replacing a working offline set with empty placeholder rows.
+    private static final double COMMIT_THRESHOLD = 0.8;
 
     @Inject RestServiceFactory mFactory;
     @Inject ReadabilityClient mReadabilityClient;
@@ -107,29 +111,45 @@ public class HotCacheJobService extends JobService {
         HackerNewsClient.RestService service = mFactory.create(HackerNewsClient.BASE_API_URL,
                 HackerNewsClient.RestService.class);
         int limit = Preferences.Offline.getHotCacheCount(this);
-        Set<Integer> ids = new LinkedHashSet<>();
-        updateProgress(0, 0, true);
         int[] topStories = networkTopStories(service);
         int[] bestStories = networkBestStories(service);
-        StoryListCache.put(this, ItemManager.TOP_FETCH_MODE, topStories, limit);
-        StoryListCache.put(this, ItemManager.BEST_FETCH_MODE, bestStories, limit);
+        Set<Integer> ids = new LinkedHashSet<>();
         addStories(ids, topStories, limit);
         addStories(ids, bestStories, limit);
+        if (ids.isEmpty()) {
+            // Story-list fetch failed; keep the existing offline set untouched.
+            return false;
+        }
+        updateProgress(0, 0, true);
         int total = ids.size();
         int downloaded = 0;
+        int storiesCached = 0;
         for (Integer id : ids) {
             if (Thread.currentThread().isInterrupted()) {
                 return false;
             }
             String storyId = String.valueOf(id);
-            boolean cached = isCached(service, storyId);
-            if (!cached) {
+            if (!isCached(service, storyId)) {
                 syncStory(storyId);
+            }
+            if (cachedItem(service, storyId) != null) {
+                storiesCached++;
             }
             downloaded++;
             updateProgress(downloaded, total, false);
         }
-        return !Thread.currentThread().isInterrupted();
+        if (Thread.currentThread().isInterrupted()) {
+            return false;
+        }
+        // Only advance the cached story list (and let the caller garbage collect the previous
+        // set) once enough story bodies actually downloaded. Otherwise a spotty connection that
+        // fetches the id list but fails the item downloads would evict a working offline set.
+        if (storiesCached < Math.ceil(total * COMMIT_THRESHOLD)) {
+            return false;
+        }
+        StoryListCache.put(this, ItemManager.TOP_FETCH_MODE, topStories, limit);
+        StoryListCache.put(this, ItemManager.BEST_FETCH_MODE, bestStories, limit);
+        return true;
     }
 
     @WorkerThread

@@ -126,6 +126,12 @@ public class HackerNewsClient implements ItemManager, UserManager {
 
     @Override
     public Item[] getStories(String filter, @CacheMode int cacheMode) {
+        if (cacheMode == MODE_CACHE) {
+            int[] cachedIds = StoryListCache.get(mContext, normalizeFilter(filter));
+            if (cachedIds != null && cachedIds.length > 0) {
+                return toItems(cachedIds);
+            }
+        }
         try {
             int[] ids = getStoriesCall(filter, cacheMode).execute().body();
             if (ids == null) {
@@ -187,6 +193,15 @@ public class HackerNewsClient implements ItemManager, UserManager {
 
     @NonNull
     private Observable<Item[]> getStoriesObservable(@FetchMode String filter, @CacheMode int cacheMode) {
+        if (cacheMode == MODE_CACHE) {
+            // Offline: serve the last fully-committed hot-cache list rather than OkHttp's
+            // story-id cache, which can race ahead of the downloaded item bodies on a spotty
+            // connection. Falls through to the HTTP cache when hot caching isn't populated.
+            int[] cachedIds = StoryListCache.get(mContext, normalizeFilter(filter));
+            if (cachedIds != null && cachedIds.length > 0) {
+                return Observable.just((Item[]) toItems(cachedIds));
+            }
+        }
         Observable<int[]> observable;
         switch (filter) {
             case NEW_FETCH_MODE:
