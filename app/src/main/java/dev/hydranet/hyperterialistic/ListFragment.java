@@ -203,7 +203,8 @@ public class ListFragment extends BaseListFragment {
             if (itemLists.first != null) {
                 onItemsLoaded(itemLists.first);
             }
-            if (itemLists.second != null) {
+            // Surface the current result even when null, else a (null, null) pair leaves the spinner stuck.
+            if (itemLists.second != null || itemLists.first == null) {
                 onItemsLoaded(itemLists.second);
             }
         });

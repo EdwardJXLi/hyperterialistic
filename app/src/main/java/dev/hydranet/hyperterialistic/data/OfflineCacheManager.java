@@ -95,12 +95,7 @@ public class OfflineCacheManager {
         }
     }
 
-    /**
-     * Drops cached HTTP item responses for stories/comments that are no longer retained. The
-     * OkHttp disk cache is otherwise only bounded by its own LRU and accumulates an entry for
-     * every item ever browsed, so the offline stats would report hundreds of cached stories
-     * even when the hot cache only retains a handful.
-     */
+    // Drops OkHttp item responses not in the retained set; its LRU otherwise keeps every item ever browsed.
     private void evictStaleHttpItems(Set<String> retainedItemIds) {
         if (mHttpCache == null) {
             return;
@@ -114,7 +109,7 @@ public class OfflineCacheManager {
                 }
             }
         } catch (IOException e) {
-            // Best effort; the LRU will reclaim the space eventually.
+            // Best effort.
         }
     }
 

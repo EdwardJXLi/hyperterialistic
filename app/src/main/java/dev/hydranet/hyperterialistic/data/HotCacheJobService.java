@@ -201,8 +201,7 @@ public class HotCacheJobService extends JobService {
                     .build());
         });
         try {
-            // Cap per-story work so a spotty connection can't stall the whole job for hours;
-            // individual requests are already bounded by OkHttp's call timeout.
+            // Cap per-story work so a spotty connection can't stall the job for hours.
             if (!latch.await(3, TimeUnit.MINUTES)) {
                 stopSync(syncDelegate[0]);
             }

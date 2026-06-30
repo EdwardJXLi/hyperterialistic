@@ -51,9 +51,7 @@ class NetworkModule {
     private static final String TAG_OK_HTTP = "OkHttp";
     private static final long CACHE_SIZE = 20 * 1024 * 1024; // 20 MB
 
-    // Overall cap per request so a connection that connects then trickles bytes (e.g. on a
-    // subway) can't keep a call alive indefinitely; the per-operation timeouts only bound a
-    // single read/write gap, not the whole call.
+    // callTimeout caps the whole request so a trickling connection can't hang indefinitely.
     private static final long CONNECT_TIMEOUT_SECONDS = 10;
     private static final long READ_WRITE_TIMEOUT_SECONDS = 15;
     private static final long CALL_TIMEOUT_SECONDS = 30;

@@ -303,12 +303,7 @@ public class AppUtils {
                 capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
     }
 
-    /**
-     * Reports whether the active network can actually move data. Requires the network to be
-     * both INTERNET-capable and VALIDATED, so a connected-but-dead link (captive portal, a
-     * subway tunnel with signal but no throughput) is treated as offline rather than the app
-     * stalling on requests that never complete.
-     */
+    // Requires VALIDATED so a connected-but-dead link (captive portal, subway) reads as offline.
     public static boolean hasConnection(Context context) {
         NetworkCapabilities capabilities = activeCapabilities(context);
         return capabilities != null &&

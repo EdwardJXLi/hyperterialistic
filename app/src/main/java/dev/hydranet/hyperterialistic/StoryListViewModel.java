@@ -33,10 +33,7 @@ public class StoryListViewModel extends ViewModel {
     }
 
     public void refreshStories(String filter, @ItemManager.CacheMode int cacheMode) {
-        // Note: do not bail when getValue() is null. If the initial load hung (e.g. a flaky
-        // connection that never completed before call timeouts were in place), getValue() stays
-        // null forever and a guarded refresh would no-op on every subsequent pull, leaving the
-        // refresh spinner stuck until the app is force-restarted.
+        // Don't bail on null getValue(): a hung initial load would otherwise no-op every refresh.
         if (mItems == null) {
             getStories(filter, cacheMode);
             return;
