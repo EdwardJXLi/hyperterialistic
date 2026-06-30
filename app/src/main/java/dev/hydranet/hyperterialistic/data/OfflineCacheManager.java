@@ -28,22 +28,35 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import dev.hydranet.hyperterialistic.R;
 import dev.hydranet.hyperterialistic.widget.CacheableWebView;
+import okhttp3.Cache;
 
 public class OfflineCacheManager {
     private static final int MAX_SCAN_BYTES = 256 * 1024;
+    // Matches Hacker News item endpoints, e.g. https://.../v0/item/12345.json
+    private static final Pattern ITEM_URL_PATTERN =
+            Pattern.compile(".*/v0/item/(\\d+)\\.json.*");
 
     private final Context mContext;
     private final MaterialisticDatabase mDatabase;
+    private final Cache mHttpCache;
 
     public OfflineCacheManager(Context context) {
+        this(context, null);
+    }
+
+    public OfflineCacheManager(Context context, Cache httpCache) {
         mContext = context.getApplicationContext();
         mDatabase = MaterialisticDatabase.getInstance(mContext);
+        mHttpCache = httpCache;
     }
 
     public Stats getStats() {
@@ -74,10 +87,34 @@ public class OfflineCacheManager {
         HackerNewsItemCache.retainOnly(mContext, retainedCache.itemIds);
         ArticleCache.retainOnly(mContext, retainedCache.articleUrls);
         deleteStaleWebArchives(mContext.getCacheDir(), retainedCache.articleUrls);
+        evictStaleHttpItems(retainedCache.itemIds);
         if (retainedCache.itemIds.isEmpty()) {
             mDatabase.getReadableDao().deleteAll();
         } else {
             mDatabase.getReadableDao().deleteExcept(new ArrayList<>(retainedCache.itemIds));
+        }
+    }
+
+    /**
+     * Drops cached HTTP item responses for stories/comments that are no longer retained. The
+     * OkHttp disk cache is otherwise only bounded by its own LRU and accumulates an entry for
+     * every item ever browsed, so the offline stats would report hundreds of cached stories
+     * even when the hot cache only retains a handful.
+     */
+    private void evictStaleHttpItems(Set<String> retainedItemIds) {
+        if (mHttpCache == null) {
+            return;
+        }
+        try {
+            Iterator<String> urls = mHttpCache.urls();
+            while (urls.hasNext()) {
+                Matcher matcher = ITEM_URL_PATTERN.matcher(urls.next());
+                if (matcher.matches() && !retainedItemIds.contains(matcher.group(1))) {
+                    urls.remove();
+                }
+            }
+        } catch (IOException e) {
+            // Best effort; the LRU will reclaim the space eventually.
         }
     }
 

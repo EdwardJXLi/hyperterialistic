@@ -31,7 +31,8 @@ import android.content.res.TypedArray;
 import android.graphics.Color;
 import android.graphics.Point;
 import android.net.ConnectivityManager;
-import android.net.NetworkInfo;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Parcelable;
@@ -297,17 +298,35 @@ public class AppUtils {
     }
 
     public static boolean isOnWiFi(Context context) {
-        NetworkInfo activeNetwork = ((ConnectivityManager) context.getSystemService(
-                Context.CONNECTIVITY_SERVICE)).getActiveNetworkInfo();
-        return activeNetwork != null &&
-                activeNetwork.isConnectedOrConnecting() &&
-                activeNetwork.getType() == ConnectivityManager.TYPE_WIFI;
+        NetworkCapabilities capabilities = activeCapabilities(context);
+        return capabilities != null &&
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
     }
 
+    /**
+     * Reports whether the active network can actually move data. Requires the network to be
+     * both INTERNET-capable and VALIDATED, so a connected-but-dead link (captive portal, a
+     * subway tunnel with signal but no throughput) is treated as offline rather than the app
+     * stalling on requests that never complete.
+     */
     public static boolean hasConnection(Context context) {
-        NetworkInfo activeNetworkInfo = ((ConnectivityManager) context.getSystemService(
-                Context.CONNECTIVITY_SERVICE)).getActiveNetworkInfo();
-        return activeNetworkInfo != null && activeNetworkInfo.isConnectedOrConnecting();
+        NetworkCapabilities capabilities = activeCapabilities(context);
+        return capabilities != null &&
+                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
+    }
+
+    private static NetworkCapabilities activeCapabilities(Context context) {
+        ConnectivityManager manager = (ConnectivityManager) context.getSystemService(
+                Context.CONNECTIVITY_SERVICE);
+        if (manager == null) {
+            return null;
+        }
+        Network network = manager.getActiveNetwork();
+        if (network == null) {
+            return null;
+        }
+        return manager.getNetworkCapabilities(network);
     }
 
     @ItemManager.CacheMode

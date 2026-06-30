@@ -58,6 +58,7 @@ public class HotCacheJobService extends JobService {
     @Inject RestServiceFactory mFactory;
     @Inject ReadabilityClient mReadabilityClient;
     @Inject LocalCache mLocalCache;
+    @Inject okhttp3.Cache mHttpCache;
     private volatile Thread mThread;
     private NotificationManager mNotificationManager;
 
@@ -87,7 +88,7 @@ public class HotCacheJobService extends JobService {
         mThread = new Thread(() -> {
             Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
             if (cacheHotStories()) {
-                new OfflineCacheManager(this).garbageCollect();
+                new OfflineCacheManager(this, mHttpCache).garbageCollect();
             }
             cancelProgress();
             jobFinished(params, false);
@@ -200,7 +201,9 @@ public class HotCacheJobService extends JobService {
                     .build());
         });
         try {
-            if (!latch.await(10, TimeUnit.MINUTES)) {
+            // Cap per-story work so a spotty connection can't stall the whole job for hours;
+            // individual requests are already bounded by OkHttp's call timeout.
+            if (!latch.await(3, TimeUnit.MINUTES)) {
                 stopSync(syncDelegate[0]);
             }
         } catch (InterruptedException e) {

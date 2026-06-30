@@ -25,6 +25,7 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import javax.inject.Singleton;
 import javax.net.SocketFactory;
@@ -50,14 +51,30 @@ class NetworkModule {
     private static final String TAG_OK_HTTP = "OkHttp";
     private static final long CACHE_SIZE = 20 * 1024 * 1024; // 20 MB
 
+    // Overall cap per request so a connection that connects then trickles bytes (e.g. on a
+    // subway) can't keep a call alive indefinitely; the per-operation timeouts only bound a
+    // single read/write gap, not the whole call.
+    private static final long CONNECT_TIMEOUT_SECONDS = 10;
+    private static final long READ_WRITE_TIMEOUT_SECONDS = 15;
+    private static final long CALL_TIMEOUT_SECONDS = 30;
+
     @Provides @Singleton
     public RestServiceFactory provideRestServiceFactory(Call.Factory callFactory) {
         return new RestServiceFactory.Impl(callFactory);
     }
 
     @Provides @Singleton
-    public Call.Factory provideCallFactory(Context context) {
+    public Cache provideHttpCache(Context context) {
+        return new Cache(context.getApplicationContext().getCacheDir(), CACHE_SIZE);
+    }
+
+    @Provides @Singleton
+    public Call.Factory provideCallFactory(Context context, Cache cache) {
         return new OkHttpClient.Builder()
+                .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .readTimeout(READ_WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .writeTimeout(READ_WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .callTimeout(CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .socketFactory(new SocketFactory() {
                     private SocketFactory mDefaultFactory = SocketFactory.getDefault();
 
@@ -96,7 +113,7 @@ class NetworkModule {
                         return socket;
                     }
                 })
-                .cache(new Cache(context.getApplicationContext().getCacheDir(), CACHE_SIZE))
+                .cache(cache)
                 .addNetworkInterceptor(new CacheOverrideNetworkInterceptor())
                 .addInterceptor(new ConnectionAwareInterceptor(context))
                 .addInterceptor(new LoggingInterceptor())
