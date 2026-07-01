@@ -305,7 +305,6 @@ public class WebFragment extends LazyLoadFragment
 
     private void loadUrl() {
         setWebSettings(true);
-        mWebView.setForceCacheOnly(Preferences.isReaderOfflineModeEnabled(requireContext()));
         reloadUrl(mItem.getUrl());
     }
 

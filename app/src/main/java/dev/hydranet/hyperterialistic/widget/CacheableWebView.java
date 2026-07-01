@@ -34,7 +34,6 @@ public class CacheableWebView extends WebView {
     private static final String CACHE_PREFIX = "webarchive-";
     private static final String CACHE_EXTENSION = ".mht";
     private ArchiveClient mArchiveClient = new ArchiveClient();
-    private boolean mForceCacheOnly;
 
     public CacheableWebView(Context context) {
         this(context, null);
@@ -92,21 +91,10 @@ public class CacheableWebView extends WebView {
     private void enableCache() {
         WebSettings webSettings = getSettings();
         webSettings.setAllowFileAccess(true);
-        setCacheModeInternal();
-    }
-
-    private void setCacheModeInternal() {
-        // Only go cache-only when the user explicitly enabled reader offline mode. We never switch
-        // to cache-only based on a connectivity guess: a wrong "offline" reading leaves the WebView
-        // unable to reach the network and surfaces net::ERR_CACHE_MISS even when data is available.
-        // getCacheableUrl() still serves a saved archive when one exists.
-        getSettings().setCacheMode(mForceCacheOnly ?
-                WebSettings.LOAD_CACHE_ONLY : WebSettings.LOAD_DEFAULT);
-    }
-
-    public void setForceCacheOnly(boolean forceCacheOnly) {
-        mForceCacheOnly = forceCacheOnly;
-        setCacheModeInternal();
+        // Normal loading with HTTP caching; getCacheableUrl() switches to a saved archive when one
+        // exists. We never pin the WebView to LOAD_CACHE_ONLY for a live URL — that only produces
+        // net::ERR_CACHE_MISS when the document isn't already in the WebView's cache.
+        webSettings.setCacheMode(WebSettings.LOAD_DEFAULT);
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -129,9 +117,10 @@ public class CacheableWebView extends WebView {
             getSettings().setCacheMode(WebSettings.LOAD_CACHE_ONLY);
             return Uri.fromFile(cacheFile).toString();
         }
-        // No saved copy: honor explicit reader-offline mode, otherwise always hit the network so
-        // an online read never blanks with a cache miss.
-        setCacheModeInternal();
+        // No saved archive: load from the network (Chromium still serves fresh entries from its
+        // HTTP cache). When actually offline this fails with an honest connectivity error rather
+        // than a confusing cache miss.
+        getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
         return url;
     }
 
