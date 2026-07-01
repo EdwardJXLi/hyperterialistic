@@ -311,6 +311,14 @@ public class AppUtils {
                 capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
     }
 
+    // Any INTERNET-capable interface, validated or not. Use when it's still worth attempting a
+    // network load (e.g. an un-archived article on a subway link) rather than failing outright.
+    public static boolean hasAnyNetwork(Context context) {
+        NetworkCapabilities capabilities = activeCapabilities(context);
+        return capabilities != null &&
+                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+    }
+
     private static NetworkCapabilities activeCapabilities(Context context) {
         ConnectivityManager manager = (ConnectivityManager) context.getSystemService(
                 Context.CONNECTIVITY_SERVICE);
