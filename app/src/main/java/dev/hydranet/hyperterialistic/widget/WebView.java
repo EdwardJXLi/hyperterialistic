@@ -26,7 +26,6 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebViewClient;
 
-import dev.hydranet.hyperterialistic.AppUtils;
 import dev.hydranet.hyperterialistic.annotation.Synthetic;
 
 public class WebView extends android.webkit.WebView {
@@ -78,8 +77,12 @@ public class WebView extends android.webkit.WebView {
         public void onPageStarted(android.webkit.WebView view, String url, Bitmap favicon) {
             super.onPageStarted(view, url, favicon);
             view.pageUp(true);
-            WebView webView = (WebView) view;
-            if (AppUtils.urlEquals(url, webView.mPendingUrl)) {
+            // Reveal the WebView as soon as real content starts loading. Keying this on an exact
+            // URL match against the pending URL was fragile: redirects, HSTS http->https upgrades
+            // and URL encoding make the started URL differ from what we requested, leaving the
+            // view stuck INVISIBLE (a blank white screen) even though the page loaded fine. Any
+            // non-blank page is real content, so show it.
+            if (!TextUtils.equals(url, BLANK)) {
                 view.setVisibility(VISIBLE);
             }
             if (mClient != null) {
@@ -103,6 +106,11 @@ public class WebView extends android.webkit.WebView {
                 webView.mPendingUrl = null;
                 webView.mPendingHtml = null;
                 view.clearHistory();
+            }
+            // Safety net: a finished non-blank page is real content, so make sure it's visible
+            // even if onPageStarted was missed or the URL changed during the load.
+            if (!TextUtils.equals(url, BLANK)) {
+                view.setVisibility(VISIBLE);
             }
             if (mClient != null) {
                 mClient.onPageFinished(view, url);
