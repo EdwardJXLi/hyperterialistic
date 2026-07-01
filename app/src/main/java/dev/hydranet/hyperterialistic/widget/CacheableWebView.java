@@ -99,10 +99,9 @@ public class CacheableWebView extends WebView {
     }
 
     private void setCacheModeInternal() {
-        // Only force cache-only when there's no usable interface at all. On an unvalidated link
-        // (subway) still allow LOAD_CACHE_ELSE_NETWORK so un-archived articles can attempt a load
-        // instead of blanking.
-        getSettings().setCacheMode(mForceCacheOnly || !AppUtils.hasAnyNetwork(getContext()) ?
+        // Cache-only only when there's no network at all; otherwise LOAD_CACHE_ELSE_NETWORK so a
+        // page falls back to the network instead of blanking.
+        getSettings().setCacheMode(mForceCacheOnly || !AppUtils.hasConnection(getContext()) ?
                 WebSettings.LOAD_CACHE_ONLY : WebSettings.LOAD_CACHE_ELSE_NETWORK);
     }
 

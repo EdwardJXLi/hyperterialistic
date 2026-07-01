@@ -303,17 +303,12 @@ public class AppUtils {
                 capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
     }
 
-    // Requires VALIDATED so a connected-but-dead link (captive portal, subway) reads as offline.
+    // True when there's an active INTERNET-capable interface. Deliberately does NOT require
+    // NET_CAPABILITY_VALIDATED: validation is often absent on working networks (probe delay, some
+    // carriers/VPNs, IPv6-only), and requiring it forces the whole app into cache-only mode and
+    // returns cache misses despite real internet. Genuinely dead links are handled downstream by
+    // the OkHttp call timeout plus graceful cache fallback.
     public static boolean hasConnection(Context context) {
-        NetworkCapabilities capabilities = activeCapabilities(context);
-        return capabilities != null &&
-                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
-    }
-
-    // Any INTERNET-capable interface, validated or not. Use when it's still worth attempting a
-    // network load (e.g. an un-archived article on a subway link) rather than failing outright.
-    public static boolean hasAnyNetwork(Context context) {
         NetworkCapabilities capabilities = activeCapabilities(context);
         return capabilities != null &&
                 capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
