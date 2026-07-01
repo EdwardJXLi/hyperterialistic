@@ -28,35 +28,22 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import dev.hydranet.hyperterialistic.R;
 import dev.hydranet.hyperterialistic.widget.CacheableWebView;
-import okhttp3.Cache;
 
 public class OfflineCacheManager {
     private static final int MAX_SCAN_BYTES = 256 * 1024;
-    // Matches Hacker News item endpoints, e.g. https://.../v0/item/12345.json
-    private static final Pattern ITEM_URL_PATTERN =
-            Pattern.compile(".*/v0/item/(\\d+)\\.json.*");
 
     private final Context mContext;
     private final MaterialisticDatabase mDatabase;
-    private final Cache mHttpCache;
 
     public OfflineCacheManager(Context context) {
-        this(context, null);
-    }
-
-    public OfflineCacheManager(Context context, Cache httpCache) {
         mContext = context.getApplicationContext();
         mDatabase = MaterialisticDatabase.getInstance(mContext);
-        mHttpCache = httpCache;
     }
 
     public Stats getStats() {
@@ -87,29 +74,15 @@ public class OfflineCacheManager {
         HackerNewsItemCache.retainOnly(mContext, retainedCache.itemIds);
         ArticleCache.retainOnly(mContext, retainedCache.articleUrls);
         deleteStaleWebArchives(mContext.getCacheDir(), retainedCache.articleUrls);
-        evictStaleHttpItems(retainedCache.itemIds);
+        // Intentionally do NOT prune the OkHttp disk cache here. It is the app's opportunistic
+        // offline tier: OfflineItemCache (the green checkmark) and getItem(MODE_CACHE) both treat
+        // an item as cached when it's in the OkHttp cache, even after it's evicted from
+        // HackerNewsItemCache. Pruning it by hot-cache membership evicts readable browsed stories
+        // and turns checkmarked items into cache misses. The cache is already bounded (20 MB LRU).
         if (retainedCache.itemIds.isEmpty()) {
             mDatabase.getReadableDao().deleteAll();
         } else {
             mDatabase.getReadableDao().deleteExcept(new ArrayList<>(retainedCache.itemIds));
-        }
-    }
-
-    // Drops OkHttp item responses not in the retained set; its LRU otherwise keeps every item ever browsed.
-    private void evictStaleHttpItems(Set<String> retainedItemIds) {
-        if (mHttpCache == null) {
-            return;
-        }
-        try {
-            Iterator<String> urls = mHttpCache.urls();
-            while (urls.hasNext()) {
-                Matcher matcher = ITEM_URL_PATTERN.matcher(urls.next());
-                if (matcher.matches() && !retainedItemIds.contains(matcher.group(1))) {
-                    urls.remove();
-                }
-            }
-        } catch (IOException e) {
-            // Best effort.
         }
     }
 

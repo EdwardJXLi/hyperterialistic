@@ -58,7 +58,6 @@ public class HotCacheJobService extends JobService {
     @Inject RestServiceFactory mFactory;
     @Inject ReadabilityClient mReadabilityClient;
     @Inject LocalCache mLocalCache;
-    @Inject okhttp3.Cache mHttpCache;
     private volatile Thread mThread;
     private NotificationManager mNotificationManager;
 
@@ -88,7 +87,7 @@ public class HotCacheJobService extends JobService {
         mThread = new Thread(() -> {
             Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
             if (cacheHotStories()) {
-                new OfflineCacheManager(this, mHttpCache).garbageCollect();
+                new OfflineCacheManager(this).garbageCollect();
             }
             cancelProgress();
             jobFinished(params, false);

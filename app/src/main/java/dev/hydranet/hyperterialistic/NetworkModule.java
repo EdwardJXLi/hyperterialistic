@@ -62,12 +62,7 @@ class NetworkModule {
     }
 
     @Provides @Singleton
-    public Cache provideHttpCache(Context context) {
-        return new Cache(context.getApplicationContext().getCacheDir(), CACHE_SIZE);
-    }
-
-    @Provides @Singleton
-    public Call.Factory provideCallFactory(Context context, Cache cache) {
+    public Call.Factory provideCallFactory(Context context) {
         return new OkHttpClient.Builder()
                 .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .readTimeout(READ_WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -111,7 +106,7 @@ class NetworkModule {
                         return socket;
                     }
                 })
-                .cache(cache)
+                .cache(new Cache(context.getApplicationContext().getCacheDir(), CACHE_SIZE))
                 .addNetworkInterceptor(new CacheOverrideNetworkInterceptor())
                 .addInterceptor(new ConnectionAwareInterceptor(context))
                 .addInterceptor(new LoggingInterceptor())
