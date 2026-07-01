@@ -71,6 +71,10 @@ public class SyncDelegate {
     private static final String NOTIFICATION_GROUP_KEY = "group";
     private static final String SYNC_ACCOUNT_NAME = "Materialistic";
     private static final long TIMEOUT_MILLIS = 10 * DateUtils.MINUTE_IN_MILLIS;
+    // Bounds a single article's WebView load. Reaching 100% is the last piece of a story's sync,
+    // and a page that never finishes (e.g. a spotty link) would otherwise hang the per-story
+    // latch for its full timeout. When this fires we release the article as done-but-uncached.
+    private static final long ARTICLE_LOAD_TIMEOUT_MILLIS = 45 * DateUtils.SECOND_IN_MILLIS;
     private static final String DOWNLOADS_CHANNEL_ID = "downloads";
 
     private final HackerNewsClient.RestService mHnRestService;
@@ -84,6 +88,7 @@ public class SyncDelegate {
     private ProgressListener mListener;
     private Job mJob;
     @VisibleForTesting CacheableWebView mWebView;
+    private Runnable mArticleTimeout;
 
     @Inject
     SyncDelegate(Context context, RestServiceFactory factory,
@@ -260,12 +265,30 @@ public class SyncDelegate {
                 super.onProgressChanged(view, newProgress);
                 notifyArticle(newProgress);
                 if (newProgress == 100) {
+                    cancelArticleTimeout();
                     ArticleCache.put(mContext, item.getUrl());
                 }
             }
         });
         notifyArticle(0);
+        mArticleTimeout = () -> {
+            mArticleTimeout = null;
+            if (mWebView != null) {
+                mWebView.stopLoading();
+            }
+            // Release the article slot so the story can finish; leave it uncached since the
+            // page never fully loaded.
+            notifyArticle(100);
+        };
+        mHandler.postDelayed(mArticleTimeout, ARTICLE_LOAD_TIMEOUT_MILLIS);
         mWebView.loadUrl(item.getUrl());
+    }
+
+    private void cancelArticleTimeout() {
+        if (mArticleTimeout != null) {
+            mHandler.removeCallbacks(mArticleTimeout);
+            mArticleTimeout = null;
+        }
     }
 
     private void syncChildren(@NonNull HackerNewsItem item) {
@@ -349,6 +372,7 @@ public class SyncDelegate {
 
     void stopSync() {
         // TODO
+        cancelArticleTimeout();
         mJob.connectionEnabled = false;
         int id = Integer.valueOf(mJob.id);
         mNotificationManager.cancel(id);
