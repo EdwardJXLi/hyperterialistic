@@ -55,7 +55,6 @@ import javax.inject.Named;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.widget.NestedScrollView;
 import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.Fragment;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
@@ -87,11 +86,10 @@ public class WebFragment extends LazyLoadFragment
     public static final String PDF_LOADER_URL = "file:///android_asset/pdf/index.html";
     private static final String PDF_MIME_TYPE = "application/pdf";
     @Synthetic CacheableWebView mWebView;
-    private NestedScrollView mScrollView;
+    private ViewGroup mScrollView;
     @Synthetic boolean mExternalRequired = false;
     @Inject @Named(ActivityModule.HN) ItemManager mItemManager;
     @Inject PopupMenu mPopupMenu;
-    private KeyDelegate.NestedScrollViewHelper mScrollableHelper;
     private final Preferences.Observable mPreferenceObservable = new Preferences.Observable();
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
         @Override
@@ -153,7 +151,7 @@ public class WebFragment extends LazyLoadFragment
             mFragmentView = inflater.inflate(R.layout.fragment_web, container, false);
             mFullscreenView = (ViewGroup) mFragmentView.findViewById(R.id.fullscreen);
             mScrollViewContent = (ViewGroup) mFragmentView.findViewById(R.id.scroll_view_content);
-            mScrollView = (NestedScrollView) mFragmentView.findViewById(R.id.nested_scroll_view);
+            mScrollView = (ViewGroup) mFragmentView.findViewById(R.id.nested_scroll_view);
             mControls = (ViewSwitcher) mFragmentView.findViewById(R.id.control_switcher);
             mWebView = (CacheableWebView) mFragmentView.findViewById(R.id.web_view);
             mButtonRefresh = (ImageButton) mFragmentView.findViewById(R.id.button_refresh);
@@ -172,7 +170,6 @@ public class WebFragment extends LazyLoadFragment
         super.onViewCreated(view, savedInstanceState);
         setHasOptionsMenu(true);
         if (isNewInstance()) {
-            mScrollableHelper = new KeyDelegate.NestedScrollViewHelper(mScrollView);
             mSystemUiHelper = new AppUtils.SystemUiHelper(getActivity().getWindow());
             mSystemUiHelper.setEnabled(!getResources().getBoolean(R.bool.multi_pane));
             if (mFullscreen) {
@@ -251,31 +248,20 @@ public class WebFragment extends LazyLoadFragment
 
     @Override
     public void scrollToTop() {
-        if (mFullscreen) {
-            mWebView.pageUp(true);
-        } else {
-            mScrollableHelper.scrollToTop();
-        }
+        // The WebView scrolls its own content in both fullscreen and inline modes.
+        mWebView.pageUp(true);
     }
 
     @Override
     public boolean scrollToNext() {
-        if (mFullscreen) {
-            mWebView.pageDown(false);
-            return true;
-        } else {
-            return mScrollableHelper.scrollToNext();
-        }
+        mWebView.pageDown(false);
+        return true;
     }
 
     @Override
     public boolean scrollToPrevious() {
-        if (mFullscreen) {
-            mWebView.pageUp(false);
-            return true;
-        } else {
-            return mScrollableHelper.scrollToPrevious();
-        }
+        mWebView.pageUp(false);
+        return true;
     }
 
     @Override
@@ -507,11 +493,11 @@ public class WebFragment extends LazyLoadFragment
         mControls.setVisibility(isFullscreen ? VISIBLE : View.GONE);
         AppUtils.toggleWebViewZoom(mWebView.getSettings(), isFullscreen);
         ViewGroup.LayoutParams params = mWebView.getLayoutParams();
+        // The WebView keeps its own scroll position as it moves between containers, so there's
+        // no scroll state to sync here.
         if (isFullscreen) {
             mScrollView.removeView(mScrollViewContent);
-            mWebView.scrollTo(mScrollView.getScrollX(), mScrollView.getScrollY());
             mFullscreenView.addView(mScrollViewContent);
-            params.height = ViewGroup.LayoutParams.MATCH_PARENT;
         } else {
             reset();
             // We'll zoom out until it returns false, which means it has min zoom level.
@@ -523,9 +509,8 @@ public class WebFragment extends LazyLoadFragment
             }
             mFullscreenView.removeView(mScrollViewContent);
             mScrollView.addView(mScrollViewContent);
-            mScrollView.post(() -> mScrollView.scrollTo(mWebView.getScrollX(), mWebView.getScrollY()));
-            params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
         }
+        params.height = ViewGroup.LayoutParams.MATCH_PARENT;
         mWebView.setLayoutParams(params);
     }
 
