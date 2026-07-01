@@ -103,6 +103,10 @@ public class CacheableWebView extends WebView {
         webSettings.setLoadWithOverviewMode(true);
         webSettings.setUseWideViewPort(true);
         webSettings.setJavaScriptEnabled(true);
+        // Without DOM storage, sites that touch localStorage/sessionStorage during their initial
+        // render (most client-rendered pages) throw and paint nothing — a blank white page with
+        // no error.
+        webSettings.setDomStorageEnabled(true);
     }
 
     private String getCacheableUrl(String url) {
