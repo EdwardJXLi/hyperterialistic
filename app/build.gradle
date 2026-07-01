@@ -17,8 +17,8 @@ android {
         applicationId "dev.hydranet.hyperterialistic"
         minSdk = 23
         targetSdk = 36
-        versionCode = 86
-        versionName = "4.6"
+        versionCode = 87
+        versionName = "4.7"
         buildConfigField "int", "LATEST_RELEASE", "77"
         buildConfigField "String", "GITHUB_TOKEN", "\"\""
         buildConfigField "String", "MERCURY_TOKEN", "\"\""
