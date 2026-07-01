@@ -62,6 +62,8 @@ public abstract class ItemRecyclerViewAdapter<VH extends ItemRecyclerViewAdapter
         extends RecyclerViewAdapter<VH> {
     private static final String PROPERTY_MAX_LINES = "maxLines";
     private static final int DURATION_PER_LINE_MILLIS = 20;
+    // Revision < 0 means the row still needs to be fetched; onBindViewHolder reloads it.
+    private static final int NEEDS_LOAD_REVISION = -1;
     LayoutInflater mLayoutInflater;
     private ItemManager mItemManager;
     @Inject UserServices mUserServices;
@@ -379,15 +381,24 @@ public abstract class ItemRecyclerViewAdapter<VH extends ItemRecyclerViewAdapter
 
         @Override
         public void onResponse(@Nullable Item response) {
-            if (mAdapter.get() != null && mAdapter.get().isAttached() && response != null) {
+            if (mAdapter.get() == null || !mAdapter.get().isAttached()) {
+                return;
+            }
+            if (response != null) {
                 mPartialItem.populate(response);
                 mAdapter.get().onItemLoaded(mPosition, mPartialItem);
+            } else {
+                // Empty result (e.g. cache miss on a cache-only fetch). Leave the row marked as
+                // needing a load so it retries when re-bound, instead of stranding it blank.
+                mPartialItem.setLocalRevision(NEEDS_LOAD_REVISION);
             }
         }
 
         @Override
         public void onError(String errorMessage) {
-            // do nothing
+            // Reset to the needs-load state so the row retries on the next bind (scroll back or
+            // refresh) rather than staying permanently blank after a transient failure.
+            mPartialItem.setLocalRevision(NEEDS_LOAD_REVISION);
         }
     }
 
