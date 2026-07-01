@@ -30,8 +30,6 @@ import android.webkit.WebViewClient;
 import java.io.File;
 import java.util.Map;
 
-import dev.hydranet.hyperterialistic.AppUtils;
-
 public class CacheableWebView extends WebView {
     private static final String CACHE_PREFIX = "webarchive-";
     private static final String CACHE_EXTENSION = ".mht";
@@ -93,16 +91,17 @@ public class CacheableWebView extends WebView {
 
     private void enableCache() {
         WebSettings webSettings = getSettings();
-        webSettings.setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
         webSettings.setAllowFileAccess(true);
         setCacheModeInternal();
     }
 
     private void setCacheModeInternal() {
-        // Cache-only only when there's no network at all; otherwise LOAD_CACHE_ELSE_NETWORK so a
-        // page falls back to the network instead of blanking.
-        getSettings().setCacheMode(mForceCacheOnly || !AppUtils.hasConnection(getContext()) ?
-                WebSettings.LOAD_CACHE_ONLY : WebSettings.LOAD_CACHE_ELSE_NETWORK);
+        // Only go cache-only when the user explicitly enabled reader offline mode. We never switch
+        // to cache-only based on a connectivity guess: a wrong "offline" reading leaves the WebView
+        // unable to reach the network and surfaces net::ERR_CACHE_MISS even when data is available.
+        // getCacheableUrl() still serves a saved archive when one exists.
+        getSettings().setCacheMode(mForceCacheOnly ?
+                WebSettings.LOAD_CACHE_ONLY : WebSettings.LOAD_DEFAULT);
     }
 
     public void setForceCacheOnly(boolean forceCacheOnly) {
@@ -123,12 +122,17 @@ public class CacheableWebView extends WebView {
             return url;
         }
         mArchiveClient.cacheFileName = generateCacheFilename(url);
-        setCacheModeInternal();
-        if (getSettings().getCacheMode() != WebSettings.LOAD_CACHE_ONLY) {
-            return url;
-        }
         File cacheFile = new File(mArchiveClient.cacheFileName);
-        return cacheFile.exists() ? Uri.fromFile(cacheFile).toString() : url;
+        if (cacheFile.exists()) {
+            // Serve the saved archive: works offline, loads fast, and avoids re-fetching. A
+            // file:// URL loads regardless of cache mode.
+            getSettings().setCacheMode(WebSettings.LOAD_CACHE_ONLY);
+            return Uri.fromFile(cacheFile).toString();
+        }
+        // No saved copy: honor explicit reader-offline mode, otherwise always hit the network so
+        // an online read never blanks with a cache miss.
+        setCacheModeInternal();
+        return url;
     }
 
     private String generateCacheFilename(String url) {
