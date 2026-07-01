@@ -9,12 +9,14 @@ import dev.hydranet.hyperterialistic.data.Item;
 import dev.hydranet.hyperterialistic.data.ItemManager;
 import rx.Observable;
 import rx.Scheduler;
+import rx.Subscription;
 import rx.android.schedulers.AndroidSchedulers;
 
 public class StoryListViewModel extends ViewModel {
     private ItemManager mItemManager;
     private Scheduler mIoThreadScheduler;
     private MutableLiveData<Pair<Item[], Item[]>> mItems; // first = last updated, second = current
+    private Subscription mSubscription;
 
     public void inject(ItemManager itemManager, Scheduler ioThreadScheduler) {
         mItemManager = itemManager;
@@ -24,10 +26,7 @@ public class StoryListViewModel extends ViewModel {
     public LiveData<Pair<Item[], Item[]>> getStories(String filter, @ItemManager.CacheMode int cacheMode) {
         if (mItems == null) {
             mItems = new MutableLiveData<>();
-            Observable.fromCallable(() -> mItemManager.getStories(filter, cacheMode))
-                    .subscribeOn(mIoThreadScheduler)
-                    .observeOn(AndroidSchedulers.mainThread())
-                    .subscribe(items -> setItems(items), throwable -> setItems(null));
+            load(filter, cacheMode);
         }
         return mItems;
     }
@@ -38,14 +37,30 @@ public class StoryListViewModel extends ViewModel {
             getStories(filter, cacheMode);
             return;
         }
-        Observable.fromCallable(() -> mItemManager.getStories(filter, cacheMode))
+        load(filter, cacheMode);
+    }
+
+    private void load(String filter, @ItemManager.CacheMode int cacheMode) {
+        // Cancel any in-flight load so a rapid refresh can't race an older result over a newer one.
+        if (mSubscription != null) {
+            mSubscription.unsubscribe();
+        }
+        mSubscription = Observable.fromCallable(() -> mItemManager.getStories(filter, cacheMode))
                 .subscribeOn(mIoThreadScheduler)
                 .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(items -> setItems(items), throwable -> setItems(null));
-
+                .subscribe(this::setItems, throwable -> setItems(null));
     }
 
     void setItems(Item[] items) {
         mItems.setValue(Pair.create(mItems.getValue() != null ? mItems.getValue().second : null, items));
+    }
+
+    @Override
+    protected void onCleared() {
+        if (mSubscription != null) {
+            mSubscription.unsubscribe();
+            mSubscription = null;
+        }
+        super.onCleared();
     }
 }
