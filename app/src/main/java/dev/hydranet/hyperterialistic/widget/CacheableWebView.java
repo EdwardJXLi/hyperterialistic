@@ -23,16 +23,22 @@ import android.os.Build;
 import androidx.annotation.CallSuper;
 import android.text.TextUtils;
 import android.util.AttributeSet;
+import android.webkit.URLUtil;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebViewClient;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.Map;
 
 public class CacheableWebView extends WebView {
     private static final String CACHE_PREFIX = "webarchive-";
     private static final String CACHE_EXTENSION = ".mht";
+    private static final String SNAPSHOT_LOCATION_HEADER = "Snapshot-Content-Location:";
     private ArchiveClient mArchiveClient = new ArchiveClient();
 
     public CacheableWebView(Context context) {
@@ -110,22 +116,58 @@ public class CacheableWebView extends WebView {
     }
 
     private String getCacheableUrl(String url) {
-        if (TextUtils.equals(url, BLANK) || TextUtils.equals(url, FILE)) {
+        if (TextUtils.equals(url, BLANK)) {
+            return url;
+        }
+        if (URLUtil.isFileUrl(url) || URLUtil.isDataUrl(url)) {
+            // Local content (a saved archive, the bundled PDF viewer, wrapped HTML): nothing to
+            // archive here, and generating a cache name for it made onProgressChanged snapshot
+            // the local content itself into a junk cache entry.
+            mArchiveClient.cacheFileName = null;
             return url;
         }
         mArchiveClient.cacheFileName = generateCacheFilename(url);
         File cacheFile = new File(mArchiveClient.cacheFileName);
         if (cacheFile.exists()) {
-            // Serve the saved archive: works offline, loads fast, and avoids re-fetching. A
-            // file:// URL loads regardless of cache mode.
-            getSettings().setCacheMode(WebSettings.LOAD_CACHE_ONLY);
-            return Uri.fromFile(cacheFile).toString();
+            if (isValidArchive(cacheFile)) {
+                // Serve the saved archive: works offline, loads fast, and avoids re-fetching. A
+                // file:// URL loads regardless of cache mode.
+                getSettings().setCacheMode(WebSettings.LOAD_CACHE_ONLY);
+                return Uri.fromFile(cacheFile).toString();
+            }
+            // A snapshot of something other than the page (about:blank interstitial, error
+            // page, truncated write): serving it shows a blank article forever. Drop it and
+            // load fresh; a good archive gets saved once the page loads.
+            //noinspection ResultOfMethodCallIgnored
+            cacheFile.delete();
         }
         // No saved archive: load from the network (Chromium still serves fresh entries from its
         // HTTP cache). When actually offline this fails with an honest connectivity error rather
         // than a confusing cache miss.
         getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
         return url;
+    }
+
+    // A usable archive is a Blink MHTML snapshot of a real web page, recorded in its
+    // Snapshot-Content-Location header. Snapshots of anything else (about:blank,
+    // chrome-error://…) render as an empty page.
+    private static boolean isValidArchive(File file) {
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(new FileInputStream(file), "UTF-8"))) {
+            for (int i = 0; i < 10; i++) {
+                String line = reader.readLine();
+                if (line == null) {
+                    return false;
+                }
+                if (line.startsWith(SNAPSHOT_LOCATION_HEADER)) {
+                    return URLUtil.isNetworkUrl(
+                            line.substring(SNAPSHOT_LOCATION_HEADER.length()).trim());
+                }
+            }
+            return false;
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     private String generateCacheFilename(String url) {
@@ -151,6 +193,13 @@ public class CacheableWebView extends WebView {
         @Override
         public void onProgressChanged(android.webkit.WebView view, int newProgress) {
             if (view.getSettings().getCacheMode() == WebSettings.LOAD_CACHE_ONLY) {
+                return;
+            }
+            // Progress also reaches 100 for the about:blank interstitial that reloadUrl()
+            // inserts before each real load. Snapshotting that moment poisoned the cache with
+            // an empty page, which was then served instead of the network on every later open
+            // — a permanently blank article. Only a loaded http(s) page is worth archiving.
+            if (!URLUtil.isNetworkUrl(view.getUrl())) {
                 return;
             }
             if (cacheFileName != null && lastProgress != 100 && newProgress == 100) {
