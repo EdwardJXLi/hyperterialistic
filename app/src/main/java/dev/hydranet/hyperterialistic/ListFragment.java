@@ -27,7 +27,9 @@ import android.os.Bundle;
 import androidx.annotation.Nullable;
 import com.google.android.material.snackbar.Snackbar;
 
+import androidx.annotation.NonNull;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
@@ -194,6 +196,24 @@ public class ListFragment extends BaseListFragment {
             }
 
         });
+        mRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            private boolean mWasRefreshingAtDragStart;
+
+            @Override
+            public void onScrollStateChanged(@NonNull RecyclerView recyclerView, int newState) {
+                if (newState == RecyclerView.SCROLL_STATE_DRAGGING) {
+                    mWasRefreshingAtDragStart = mSwipeRefreshLayout.isRefreshing();
+                } else if (newState == RecyclerView.SCROLL_STATE_IDLE
+                        && mWasRefreshingAtDragStart) {
+                    // A fresh pull flips isRefreshing() before onRefresh() has fired, so only
+                    // gestures that STARTED with the spinner already on are candidates: either
+                    // a real refresh is in flight (sync leaves it alone) or the flag is
+                    // stranded with no load behind it (sync clears it so the next pull works).
+                    mWasRefreshingAtDragStart = false;
+                    syncRefreshingState();
+                }
+            }
+        });
         mStoryListViewModel = new ViewModelProvider(this).get(StoryListViewModel.class);
         mStoryListViewModel.inject(itemManager, mIoThreadScheduler);
         mStoryListViewModel.getStories(mFilter, mCacheMode).observe(getViewLifecycleOwner(), itemLists -> {
@@ -226,6 +246,7 @@ public class ListFragment extends BaseListFragment {
             mConnectivityReceiverRegistered = true;
         }
         updateConnectionState(false);
+        syncRefreshingState();
     }
 
     @Override
@@ -268,6 +289,21 @@ public class ListFragment extends BaseListFragment {
     private void refresh() {
         getAdapter().setShowAll(true);
         mStoryListViewModel.refreshStories(mFilter, mCacheMode);
+    }
+
+    // SwipeRefreshLayout silently rejects every swipe while it believes a refresh is running,
+    // so a spinner stranded "on" with no load in flight (a canceled delivery, restored instance
+    // state, a result that arrived while detached) permanently kills pull-to-refresh. Re-align
+    // it with the ViewModel's actual state whenever the user settles a scroll or we resume.
+    @Synthetic
+    void syncRefreshingState() {
+        if (mStoryListViewModel == null) {
+            return;
+        }
+        boolean loading = mStoryListViewModel.isLoading();
+        if (mSwipeRefreshLayout.isRefreshing() != loading) {
+            mSwipeRefreshLayout.setRefreshing(loading);
+        }
     }
 
     private void updateConnectionState(boolean refreshOnReconnect) {

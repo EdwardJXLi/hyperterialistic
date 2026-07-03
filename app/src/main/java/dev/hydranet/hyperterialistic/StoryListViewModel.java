@@ -51,6 +51,10 @@ public class StoryListViewModel extends ViewModel {
                 .subscribe(this::setItems, throwable -> setItems(null));
     }
 
+    public boolean isLoading() {
+        return mSubscription != null && !mSubscription.isUnsubscribed();
+    }
+
     void setItems(Item[] items) {
         mItems.setValue(Pair.create(mItems.getValue() != null ? mItems.getValue().second : null, items));
     }

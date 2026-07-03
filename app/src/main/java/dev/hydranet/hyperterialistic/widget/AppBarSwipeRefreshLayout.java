@@ -64,4 +64,20 @@ public class AppBarSwipeRefreshLayout extends SwipeRefreshLayout implements AppB
     public void onOffsetChanged(AppBarLayout appBarLayout, int i) {
         this.setEnabled(i == 0);
     }
+
+    @Override
+    public void setEnabled(boolean enabled) {
+        if (enabled == isEnabled()) {
+            return;
+        }
+        // Disabling makes the library reset() the spinner: it hides the circle but leaves the
+        // internal refreshing flag set, and while that flag is set every future swipe is
+        // silently rejected — a permanently dead pull-to-refresh with no visual clue. Clear the
+        // state for real before disabling; a load still in flight clears it again harmlessly
+        // when it delivers.
+        if (!enabled && isRefreshing()) {
+            setRefreshing(false);
+        }
+        super.setEnabled(enabled);
+    }
 }
