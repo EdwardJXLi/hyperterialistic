@@ -18,7 +18,6 @@ package dev.hydranet.hyperterialistic;
 
 import android.graphics.Color;
 import android.os.Bundle;
-import androidx.core.widget.NestedScrollView;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.widget.Toolbar;
 import android.text.TextUtils;
@@ -44,15 +43,16 @@ public class OfflineWebActivity extends InjectableActivity {
         }
         setTitle(url);
         setContentView(R.layout.activity_offline_web);
-        final NestedScrollView scrollView = (NestedScrollView) findViewById(R.id.nested_scroll_view);
+        final WebView webView = (WebView) findViewById(R.id.web_view);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
-        toolbar.setOnClickListener(v -> scrollView.smoothScrollTo(0, 0));
+        // The WebView fills a plain FrameLayout and scrolls its own content, so scroll the page
+        // itself to the top rather than an enclosing scroll view.
+        toolbar.setOnClickListener(v -> webView.pageUp(true));
         setSupportActionBar(toolbar);
         getSupportActionBar().setDisplayOptions(ActionBar.DISPLAY_SHOW_HOME |
                 ActionBar.DISPLAY_HOME_AS_UP | ActionBar.DISPLAY_SHOW_TITLE);
         getSupportActionBar().setSubtitle(R.string.offline);
         final ProgressBar progressBar = (ProgressBar) findViewById(R.id.progress);
-        final WebView webView = (WebView) findViewById(R.id.web_view);
         webView.setBackgroundColor(Color.TRANSPARENT);
         webView.setWebViewClient(new AdBlockWebViewClient(Preferences.adBlockEnabled(this)) {
             @Override
