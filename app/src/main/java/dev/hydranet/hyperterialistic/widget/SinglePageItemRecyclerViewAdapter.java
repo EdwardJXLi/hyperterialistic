@@ -233,6 +233,7 @@ public class SinglePageItemRecyclerViewAdapter
                 } else if (mState.isExpanded(item)) {
                     setSelectedPosition(mState.indexOf(id), callback);
                 } else {
+                    item.setCollapsed(false);
                     expand(item, callback);
                 }
                 break;
@@ -297,7 +298,7 @@ public class SinglePageItemRecyclerViewAdapter
             return;
         }
         if (!item.isCollapsed() && mAutoExpand) {
-            expand(item);
+            expand(item, null, true);
         }
         bindToggle(holder, item, mState.isExpanded(item));
     }
@@ -334,6 +335,10 @@ public class SinglePageItemRecyclerViewAdapter
     }
 
     private void expand(final Item item, PositionCallback callback) {
+        expand(item, callback, false);
+    }
+
+    private void expand(final Item item, PositionCallback callback, boolean autoExpand) {
         if (mState.isExpanded(item)) {
             return;
         }
@@ -341,8 +346,12 @@ public class SinglePageItemRecyclerViewAdapter
             if (mRecyclerView == null) {
                 return; // adapter detached
             }
+            int itemIndex = mState.indexOf(item);
+            if (itemIndex < 0 || mState.isExpanded(item) || (autoExpand && item.isCollapsed())) {
+                return;
+            }
             int index = mState.expand(item);
-            notifyItemRangeInserted(index, item.getKidCount());
+            notifyItemRangeInserted(index, item.getKidItems().length);
             notifyItemChanged(index - 1, TOGGLE);
             mRecyclerView.getItemAnimator().isRunning(() -> setSelectedPosition(index, callback));
         });
@@ -350,7 +359,9 @@ public class SinglePageItemRecyclerViewAdapter
 
     private void collapse(Item item) {
         int[] collapsedState = mState.collapse(item);
-        notifyItemRangeRemoved(collapsedState[0], collapsedState[1]);
+        if (collapsedState[1] > 0) {
+            notifyItemRangeRemoved(collapsedState[0], collapsedState[1]);
+        }
     }
 
     private void setSelectedPosition(int position, PositionCallback callback) {
@@ -434,14 +445,16 @@ public class SinglePageItemRecyclerViewAdapter
         int expand(Item item) {
             expanded.add(item.getId());
             int index = indexOf(item) + 1;
-            addAll(index, Arrays.asList(item.getKidItems())); // recursive
+            addAll(index, Arrays.asList(item.getKidItems()));
             return index;
         }
 
         @Synthetic
         int[] collapse(Item item) {
             int index = indexOf(item) + 1;
-            int count = recursiveRemove(item);
+            int countBefore = list.size();
+            recursiveRemove(item);
+            int count = countBefore - list.size();
             return new int[]{index, count};
         }
 
@@ -454,18 +467,15 @@ public class SinglePageItemRecyclerViewAdapter
             }
         }
 
-        private int recursiveRemove(Item item) {
+        private void recursiveRemove(Item item) {
             if (!isExpanded(item.getId())) {
-                return 0;
+                return;
             }
-            // if item is already expanded, its kids must be added, so we need to remove them
-            int count = item.getKidCount();
             expanded.remove(item.getId());
             for (Item kid : item.getKidItems()) {
-                count += recursiveRemove(kid);
+                recursiveRemove(kid);
                 remove(kid);
             }
-            return count;
         }
 
         private void remove(Item item) {
