@@ -90,11 +90,13 @@ public class HackerNewsClient implements ItemManager, UserManager {
             case MODE_DEFAULT:
             default:
                 itemObservable = mRestService.itemRx(itemId)
-                        .doOnNext(item -> HackerNewsItemCache.put(mContext, item));
+                        .doOnNext(item -> HackerNewsItemCache.put(mContext, item))
+                        .onErrorResumeNext(t -> cachedItemFallback(itemId, t));
                 break;
             case MODE_NETWORK:
                 itemObservable = mRestService.networkItemRx(itemId)
-                        .doOnNext(item -> HackerNewsItemCache.put(mContext, item));
+                        .doOnNext(item -> HackerNewsItemCache.put(mContext, item))
+                        .onErrorResumeNext(t -> cachedItemFallback(itemId, t));
                 break;
             case MODE_CACHE:
                 itemObservable = Observable.fromCallable(() -> HackerNewsItemCache.get(mContext, itemId))
@@ -122,6 +124,17 @@ public class HackerNewsClient implements ItemManager, UserManager {
                 .subscribe(listener::onResponse,
                         t -> listener.onError(t != null ? t.getMessage() : ""));
 
+    }
+
+    // A network item fetch that fails on a dead-but-connected link (unvalidated 5G, subway)
+    // should serve the cached copy instead of erroring, the same way getStories falls back to
+    // the cached id list. Rethrows the original error when neither cache tier has the item.
+    private Observable<HackerNewsItem> cachedItemFallback(String itemId, Throwable networkError) {
+        return Observable.fromCallable(() -> HackerNewsItemCache.get(mContext, itemId))
+                .flatMap(item -> item != null ?
+                        Observable.just(item) :
+                        mRestService.cachedItemRx(itemId))
+                .onErrorResumeNext(t -> Observable.error(networkError));
     }
 
     @Override

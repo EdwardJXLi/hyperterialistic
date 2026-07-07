@@ -602,12 +602,10 @@ public class StoryRecyclerViewAdapter extends
 
         @Override
         public void onError(String errorMessage) {
-            StoryRecyclerViewAdapter adapter = mAdapter.get();
-            if (adapter == null || !adapter.isAttached()) {
-                return;
-            }
+            // Mark the row as needing a load so the next bind (scroll-back or refresh) retries,
+            // but don't notify: rebinding a visible row refetches immediately, and while the
+            // connection stays bad that notify->bind->fail cycle loops forever.
             mPartialItem.setLocalRevision(-1);
-            adapter.onItemLoaded(mPartialItem);
         }
     }
 
