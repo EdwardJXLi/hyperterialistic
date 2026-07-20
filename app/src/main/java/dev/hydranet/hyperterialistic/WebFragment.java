@@ -39,6 +39,9 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
 import android.webkit.JavascriptInterface;
+import android.webkit.URLUtil;
+import android.webkit.WebResourceError;
+import android.webkit.WebResourceRequest;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ProgressBar;
@@ -85,6 +88,12 @@ public class WebFragment extends LazyLoadFragment
     private static final int DEFAULT_PROGRESS = 20;
     public static final String PDF_LOADER_URL = "file:///android_asset/pdf/index.html";
     private static final String PDF_MIME_TYPE = "application/pdf";
+    // Subway-mode retries: a link that Android reports as connected can still drop page loads.
+    // Retry failed main-frame loads with growing delays; no connectivity broadcast fires when
+    // a dead-but-connected link comes back, so a timer is the only reliable signal. Six
+    // attempts (5s..160s) cover a ~5 minute dead zone between stations.
+    private static final int MAX_LOAD_RETRIES = 6;
+    private static final long LOAD_RETRY_BASE_DELAY_MILLIS = 5000;
     @Synthetic CacheableWebView mWebView;
     private ViewGroup mScrollView;
     @Synthetic boolean mExternalRequired = false;
@@ -115,6 +124,10 @@ public class WebFragment extends LazyLoadFragment
     private WebItem mItem;
     private boolean mIsHackerNewsUrl, mEmpty, mReadability;
     private PdfAndroidJavascriptBridge mPdfAndroidJavascriptBridge;
+    private final Handler mHandler = new Handler(Looper.getMainLooper());
+    @Synthetic boolean mPageLoadFailed;
+    private int mLoadRetryCount;
+    private Runnable mLoadRetry;
 
     @Override
     public void onAttach(Context context) {
@@ -233,6 +246,7 @@ public class WebFragment extends LazyLoadFragment
     @Override
     public void onDestroy() {
         super.onDestroy();
+        cancelLoadRetry();
         if (mPdfAndroidJavascriptBridge != null) {
             mPdfAndroidJavascriptBridge.cleanUp();
         }
@@ -355,6 +369,40 @@ public class WebFragment extends LazyLoadFragment
         mWebView.pauseTimers();
     }
 
+    @Synthetic
+    void scheduleLoadRetry() {
+        if (mLoadRetry != null || mLoadRetryCount >= MAX_LOAD_RETRIES || mExternalRequired) {
+            return;
+        }
+        long delay = LOAD_RETRY_BASE_DELAY_MILLIS << mLoadRetryCount;
+        mLoadRetryCount++;
+        mLoadRetry = () -> {
+            mLoadRetry = null;
+            if (!isAttached() || mWebView == null) {
+                return;
+            }
+            // Only retry while the WebView still shows the failed remote page; readability
+            // content, the PDF viewer and saved archives are all non-network URLs.
+            if (URLUtil.isNetworkUrl(mWebView.getUrl())) {
+                mWebView.reload();
+            }
+        };
+        mHandler.postDelayed(mLoadRetry, delay);
+    }
+
+    @Synthetic
+    void resetLoadRetry() {
+        mLoadRetryCount = 0;
+        cancelLoadRetry();
+    }
+
+    private void cancelLoadRetry() {
+        if (mLoadRetry != null) {
+            mHandler.removeCallbacks(mLoadRetry);
+            mLoadRetry = null;
+        }
+    }
+
     private boolean fontEnabled() {
         return mReadability && !mEmpty && !TextUtils.isEmpty(mContent);
     }
@@ -419,6 +467,7 @@ public class WebFragment extends LazyLoadFragment
             @Override
             public void onPageStarted(android.webkit.WebView view, String url, Bitmap favicon) {
                 super.onPageStarted(view, url, favicon);
+                mPageLoadFailed = false;
                 if (getActivity() != null) {
                     getActivity().invalidateOptionsMenu();
                 }
@@ -427,8 +476,21 @@ public class WebFragment extends LazyLoadFragment
             @Override
             public void onPageFinished(android.webkit.WebView view, String url) {
                 super.onPageFinished(view, url);
+                if (!mPageLoadFailed && URLUtil.isNetworkUrl(url)) {
+                    resetLoadRetry();
+                }
                 if (getActivity() != null) {
                     getActivity().invalidateOptionsMenu();
+                }
+            }
+
+            @Override
+            public void onReceivedError(android.webkit.WebView view, WebResourceRequest request,
+                                        WebResourceError error) {
+                super.onReceivedError(view, request, error);
+                if (request.isForMainFrame()) {
+                    mPageLoadFailed = true;
+                    scheduleLoadRetry();
                 }
             }
         });

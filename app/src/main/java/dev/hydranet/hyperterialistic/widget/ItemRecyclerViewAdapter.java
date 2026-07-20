@@ -25,6 +25,8 @@ import android.os.Handler;
 import android.os.Looper;
 import androidx.annotation.CallSuper;
 import androidx.annotation.Nullable;
+import androidx.collection.ArrayMap;
+import androidx.collection.ArraySet;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 import android.text.TextUtils;
@@ -64,6 +66,11 @@ public abstract class ItemRecyclerViewAdapter<VH extends ItemRecyclerViewAdapter
     private static final int DURATION_PER_LINE_MILLIS = 20;
     // Revision < 0 means the row still needs to be fetched; onBindViewHolder reloads it.
     private static final int NEEDS_LOAD_REVISION = -1;
+    // Timer-based retry with growing delays for failed comment fetches; see
+    // StoryRecyclerViewAdapter for the rationale (no broadcast fires when a dead-but-connected
+    // subway link recovers, and immediate rebinds would loop while it stays bad).
+    private static final long RETRY_BASE_DELAY_MILLIS = 5000;
+    private static final long RETRY_MAX_DELAY_MILLIS = 60000;
     LayoutInflater mLayoutInflater;
     private ItemManager mItemManager;
     @Inject UserServices mUserServices;
@@ -72,6 +79,8 @@ public abstract class ItemRecyclerViewAdapter<VH extends ItemRecyclerViewAdapter
     @Inject OfflineItemCache mOfflineItemCache;
     private final ExecutorService mCacheStatusExecutor = Executors.newSingleThreadExecutor();
     private final Handler mHandler = new Handler(Looper.getMainLooper());
+    private final ArrayMap<String, Integer> mRetryAttempts = new ArrayMap<>();
+    private final ArraySet<String> mPendingRetries = new ArraySet<>();
     private int mTertiaryTextColorResId;
     private int mSecondaryTextColorResId;
     private int mCardBackgroundColorResId;
@@ -114,6 +123,8 @@ public abstract class ItemRecyclerViewAdapter<VH extends ItemRecyclerViewAdapter
     public void detach(Context context, RecyclerView recyclerView) {
         super.detach(context, recyclerView);
         mCacheStatusExecutor.shutdownNow();
+        mHandler.removeCallbacksAndMessages(null);
+        mPendingRetries.clear();
     }
 
     @Override
@@ -233,6 +244,34 @@ public abstract class ItemRecyclerViewAdapter<VH extends ItemRecyclerViewAdapter
         if (position < getItemCount()) {
             notifyItemChanged(position);
         }
+    }
+
+    @Synthetic
+    void onItemLoadError(final int position, final Item item) {
+        item.setLocalRevision(NEEDS_LOAD_REVISION);
+        final String id = item.getId();
+        if (mPendingRetries.contains(id)) {
+            return;
+        }
+        Integer attempts = mRetryAttempts.get(id);
+        int attempt = attempts == null ? 0 : attempts;
+        long delay = Math.min(RETRY_BASE_DELAY_MILLIS << attempt, RETRY_MAX_DELAY_MILLIS);
+        mRetryAttempts.put(id, attempt + 1);
+        mPendingRetries.add(id);
+        mHandler.postDelayed(() -> {
+            mPendingRetries.remove(id);
+            if (!isAttached() || item.getLocalRevision() >= 0) {
+                return;
+            }
+            if (position < getItemCount()) {
+                notifyItemChanged(position); // rebinding a needs-load row refetches it
+            }
+        }, delay);
+    }
+
+    @Synthetic
+    void clearItemRetry(Item item) {
+        mRetryAttempts.remove(item.getId());
     }
 
     private void highlightUserItem(VH holder, Item item) {
@@ -386,19 +425,23 @@ public abstract class ItemRecyclerViewAdapter<VH extends ItemRecyclerViewAdapter
             }
             if (response != null) {
                 mPartialItem.populate(response);
+                mAdapter.get().clearItemRetry(mPartialItem);
                 mAdapter.get().onItemLoaded(mPosition, mPartialItem);
             } else {
-                // Empty result (e.g. cache miss on a cache-only fetch). Leave the row marked as
-                // needing a load so it retries when re-bound, instead of stranding it blank.
-                mPartialItem.setLocalRevision(NEEDS_LOAD_REVISION);
+                // Empty result (e.g. cache miss on a cache-only fetch): treat like a failure so
+                // the row schedules a retry instead of stranding blank.
+                onError(null);
             }
         }
 
         @Override
         public void onError(String errorMessage) {
-            // Reset to the needs-load state so the row retries on the next bind (scroll back or
-            // refresh) rather than staying permanently blank after a transient failure.
-            mPartialItem.setLocalRevision(NEEDS_LOAD_REVISION);
+            ItemRecyclerViewAdapter adapter = mAdapter.get();
+            if (adapter != null && adapter.isAttached()) {
+                adapter.onItemLoadError(mPosition, mPartialItem);
+            } else {
+                mPartialItem.setLocalRevision(NEEDS_LOAD_REVISION);
+            }
         }
     }
 

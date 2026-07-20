@@ -73,6 +73,12 @@ public class StoryRecyclerViewAdapter extends
         ListRecyclerViewAdapter<ListRecyclerViewAdapter.ItemViewHolder, Item> {
     private static final String STATE_SHOW_ALL = "state:showAll";
     private static final String STATE_USERNAME = "state:username";
+    // A row whose fetch failed retries on a timer with growing delays. Rebinding immediately
+    // would loop notify->bind->fail while the connection stays bad, but never rebinding left
+    // rows as skeletons forever - no connectivity broadcast fires when a dead-but-connected
+    // link (subway) starts working again.
+    private static final long RETRY_BASE_DELAY_MILLIS = 5000;
+    private static final long RETRY_MAX_DELAY_MILLIS = 60000;
     private final Object VOTED = new Object();
     private final RecyclerView.OnScrollListener mAutoViewScrollListener = new RecyclerView.OnScrollListener() {
         @Override
@@ -105,6 +111,8 @@ public class StoryRecyclerViewAdapter extends
     @Inject OfflineItemCache mOfflineItemCache;
     private final ExecutorService mCacheStatusExecutor = Executors.newSingleThreadExecutor();
     private final Handler mHandler = new Handler(Looper.getMainLooper());
+    private final ArrayMap<String, Integer> mRetryAttempts = new ArrayMap<>();
+    private final ArraySet<String> mPendingRetries = new ArraySet<>();
     @Synthetic final SortedList<Item> mItems = new SortedList<>(Item.class, mSortedListCallback);
     @Synthetic final ArraySet<Item> mAdded = new ArraySet<>();
     @Synthetic final ArrayMap<String, Integer> mPromoted = new ArrayMap<>();
@@ -237,6 +245,8 @@ public class StoryRecyclerViewAdapter extends
         mItemTouchHelper.attachToRecyclerView(null);
         mPrefObservable.unsubscribe(recyclerView.getContext());
         mCacheStatusExecutor.shutdownNow();
+        mHandler.removeCallbacksAndMessages(null);
+        mPendingRetries.clear();
     }
 
     @Override
@@ -463,11 +473,36 @@ public class StoryRecyclerViewAdapter extends
 
     @Synthetic
     void onItemLoaded(Item item) {
+        mRetryAttempts.remove(item.getId());
         int position = getItems().indexOf(item);
         // ignore changes if item was invalidated by refresh / filter
         if (position >= 0 && position < getItemCount()) {
             notifyItemChanged(position);
         }
+    }
+
+    @Synthetic
+    void onItemLoadError(Item item) {
+        item.setLocalRevision(-1);
+        final String id = item.getId();
+        if (mPendingRetries.contains(id)) {
+            return;
+        }
+        Integer attempts = mRetryAttempts.get(id);
+        int attempt = attempts == null ? 0 : attempts;
+        long delay = Math.min(RETRY_BASE_DELAY_MILLIS << attempt, RETRY_MAX_DELAY_MILLIS);
+        mRetryAttempts.put(id, attempt + 1);
+        mPendingRetries.add(id);
+        mHandler.postDelayed(() -> {
+            mPendingRetries.remove(id);
+            if (!isAttached() || item.getLocalRevision() >= 0) {
+                return;
+            }
+            int position = getItems().indexOf(item);
+            if (position >= 0 && position < getItemCount()) {
+                notifyItemChanged(position); // rebinding a needs-load row refetches it
+            }
+        }, delay);
     }
 
     @Synthetic
@@ -602,10 +637,12 @@ public class StoryRecyclerViewAdapter extends
 
         @Override
         public void onError(String errorMessage) {
-            // Mark the row as needing a load so the next bind (scroll-back or refresh) retries,
-            // but don't notify: rebinding a visible row refetches immediately, and while the
-            // connection stays bad that notify->bind->fail cycle loops forever.
-            mPartialItem.setLocalRevision(-1);
+            StoryRecyclerViewAdapter adapter = mAdapter.get();
+            if (adapter != null && adapter.isAttached()) {
+                adapter.onItemLoadError(mPartialItem);
+            } else {
+                mPartialItem.setLocalRevision(-1);
+            }
         }
     }
 

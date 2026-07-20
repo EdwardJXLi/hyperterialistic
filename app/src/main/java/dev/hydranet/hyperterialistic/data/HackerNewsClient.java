@@ -154,7 +154,22 @@ public class HackerNewsClient implements ItemManager, UserManager {
             return items != null ? items : new Item[0];
         } catch (IOException e) {
             Item[] cached = getCachedStories(filter);
-            return cached != null ? cached : new Item[0];
+            if (cached != null) {
+                return cached;
+            }
+            if (cacheMode != MODE_CACHE) {
+                // Same fallback chain as the async path: a stale OkHttp-cached list beats an
+                // empty screen when the network fetch fails on a bad connection.
+                try {
+                    Item[] items = toItems(getStoriesCall(filter, MODE_CACHE).execute().body());
+                    if (items != null) {
+                        return items;
+                    }
+                } catch (IOException ignored) {
+                    // fall through to empty
+                }
+            }
+            return new Item[0];
         }
     }
 
@@ -248,7 +263,40 @@ public class HackerNewsClient implements ItemManager, UserManager {
                                 mRestService.topStoriesRx();
                 break;
         }
+        if (cacheMode != MODE_CACHE) {
+            observable = observable.onErrorResumeNext(t -> cachedIdsFallback(filter, t));
+        }
         return observable.map(this::toItems);
+    }
+
+    // A story-list fetch that fails on a dead-but-connected link should serve whatever cache
+    // tier has the list: the committed hot-cache list first (its item bodies are known to be
+    // downloaded), then OkHttp's HTTP cache however stale (covers new/ask/show/jobs, which hot
+    // caching doesn't). Rethrows the original error when neither has it.
+    private Observable<int[]> cachedIdsFallback(@FetchMode String filter, Throwable networkError) {
+        int[] committed = StoryListCache.get(mContext, normalizeFilter(filter));
+        if (committed != null && committed.length > 0) {
+            return Observable.just(committed);
+        }
+        return cachedStoriesRx(normalizeFilter(filter))
+                .onErrorResumeNext(t -> Observable.error(networkError));
+    }
+
+    private Observable<int[]> cachedStoriesRx(@FetchMode String filter) {
+        switch (filter) {
+            case NEW_FETCH_MODE:
+                return mRestService.cachedNewStoriesRx();
+            case SHOW_FETCH_MODE:
+                return mRestService.cachedShowStoriesRx();
+            case ASK_FETCH_MODE:
+                return mRestService.cachedAskStoriesRx();
+            case JOBS_FETCH_MODE:
+                return mRestService.cachedJobStoriesRx();
+            case BEST_FETCH_MODE:
+                return mRestService.cachedBestStoriesRx();
+            default:
+                return mRestService.cachedTopStoriesRx();
+        }
     }
 
     @NonNull
