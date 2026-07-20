@@ -138,6 +138,17 @@ public class SyncDelegate {
         schedule(context, job);
     }
 
+    // On-demand sync for a story the user just opened. Runs under either offline mode: hot
+    // cache alone should still pull opened-but-uncached stories in the background, not only
+    // the saved-stories sync.
+    @UiThread
+    static void scheduleOpenedItemSync(Context context, Job job) {
+        if (!Preferences.Offline.isAnySyncEnabled(context)) {
+            return;
+        }
+        schedule(context, job);
+    }
+
     @UiThread
     private static void schedule(Context context, Job job) {
         if (!TextUtils.isEmpty(job.id)) {
@@ -212,6 +223,10 @@ public class SyncDelegate {
                     HackerNewsItem item;
                     if ((item = response.body()) != null) {
                         sync(item);
+                    } else {
+                        // Deleted item or empty body: report it finished, or the progress
+                        // accounting never completes and the whole sync stalls until timeout.
+                        notifyItem(itemId, null);
                     }
                 }
 
@@ -234,30 +249,56 @@ public class SyncDelegate {
     }
 
     private void syncReadability(@NonNull HackerNewsItem item) {
-        if (mJob.readabilityEnabled && item.isStoryType()) {
-            final String itemId = item.getId();
-            mReadabilityClient.parse(itemId, item.getRawUrl(), content -> notifyReadability());
+        if (!mJob.readabilityEnabled) {
+            return;
         }
+        if (!item.isStoryType()) {
+            // Only the root item reserves a readability slot in the progress accounting;
+            // release it (or the sync never reports done), but never for synced kids, whose
+            // notify would complete the root's slot prematurely.
+            if (isRootItem(item)) {
+                notifyReadability();
+            }
+            return;
+        }
+        final String itemId = item.getId();
+        mReadabilityClient.parse(itemId, item.getRawUrl(), content -> notifyReadability());
     }
 
     private void syncArticle(@NonNull HackerNewsItem item) {
-        if (mJob.articleEnabled && item.isStoryType() && !TextUtils.isEmpty(item.getUrl())) {
-            if (ArticleCache.contains(mContext, item.getUrl())) {
-                notifyArticle(100);
-                return;
-            }
-            if (Looper.myLooper() == Looper.getMainLooper()) {
-                loadArticle(item);
-            } else {
-                mContext.startService(new Intent(mContext, WebCacheService.class)
-                        .putExtra(WebCacheService.EXTRA_URL, item.getUrl()));
-                notifyArticle(100);
-            }
+        if (!mJob.articleEnabled) {
+            return;
         }
+        if (!item.isStoryType() || TextUtils.isEmpty(item.getUrl()) ||
+                ArticleCache.contains(mContext, item.getUrl())) {
+            // Nothing to load (or already archived). Release the reserved article progress,
+            // root item only: a kid notifying would complete the root's article slot while
+            // its page is still downloading.
+            if (isRootItem(item)) {
+                notifyArticle(100);
+            }
+            return;
+        }
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            loadArticle(item);
+        } else {
+            mContext.startService(new Intent(mContext, WebCacheService.class)
+                    .putExtra(WebCacheService.EXTRA_URL, item.getUrl()));
+            notifyArticle(100);
+        }
+    }
+
+    private boolean isRootItem(@NonNull HackerNewsItem item) {
+        return TextUtils.equals(item.getId(), mJob.id);
     }
 
     private void loadArticle(@NonNull final HackerNewsItem item) {
         mWebView = new CacheableWebView(mContext);
+        // Timers are paused/resumed globally across all WebViews: if the user left the app
+        // with a WebView on screen, timers are paused and this invisible sync WebView would
+        // never finish loading (pages need timers to render), so no article ever archived
+        // from the background. Resume them for the duration of the load.
+        mWebView.resumeTimers();
         mWebView.setWebViewClient(new AdBlockWebViewClient(Preferences.adBlockEnabled(mContext)));
         mWebView.setWebChromeClient(new CacheableWebView.ArchiveClient() {
             @Override
@@ -266,7 +307,6 @@ public class SyncDelegate {
                 notifyArticle(newProgress);
                 if (newProgress == 100) {
                     cancelArticleTimeout();
-                    ArticleCache.put(mContext, item.getUrl());
                 }
             }
         });
@@ -449,6 +489,14 @@ public class SyncDelegate {
                 totalKids = item.getKids().length;
             } else {
                 totalKids = 0;
+            }
+            if (item == null) {
+                // The root fetch failed, so no readability/article work will ever run for it.
+                // Release those reserved slots so progress can reach max and the sync reports
+                // done instead of hanging until its timeout (minutes per story in hot cache).
+                readability = null;
+                webProgress = maxWebProgress;
+                return;
             }
             if (readabilityEnabled) {
                 readability = false;

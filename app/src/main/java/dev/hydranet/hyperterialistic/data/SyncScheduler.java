@@ -35,6 +35,11 @@ public class SyncScheduler {
         SyncDelegate.scheduleSync(context, new SyncDelegate.JobBuilder(context, itemId).build());
     }
 
+    public void scheduleOpenedItemSync(Context context, String itemId) {
+        SyncDelegate.scheduleOpenedItemSync(context,
+                new SyncDelegate.JobBuilder(context, itemId).build());
+    }
+
     public static void scheduleHotCache(Context context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
             return;

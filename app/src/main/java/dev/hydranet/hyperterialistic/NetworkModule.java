@@ -20,6 +20,7 @@ import android.content.Context;
 import android.net.TrafficStats;
 import android.util.Log;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
@@ -106,7 +107,12 @@ class NetworkModule {
                         return socket;
                     }
                 })
-                .cache(new Cache(context.getApplicationContext().getCacheDir(), CACHE_SIZE))
+                // Own subdirectory: OkHttp's DiskLruCache deletes the entire directory it
+                // manages when it finds its journal corrupt (e.g. after installd purges cache
+                // files under storage pressure). At the cache root that wipe used to take the
+                // WebView's files with it.
+                .cache(new Cache(new File(context.getApplicationContext().getCacheDir(),
+                        "okhttp"), CACHE_SIZE))
                 .addNetworkInterceptor(new CacheOverrideNetworkInterceptor())
                 .addInterceptor(new ConnectionAwareInterceptor(context))
                 .addInterceptor(new LoggingInterceptor())

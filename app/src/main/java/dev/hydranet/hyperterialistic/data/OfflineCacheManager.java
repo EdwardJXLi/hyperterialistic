@@ -51,6 +51,7 @@ public class OfflineCacheManager {
         scanOkHttpCache(mContext.getCacheDir(), stats);
         stats.readability = mDatabase.getReadableDao().count();
         stats.bytes = size(mContext.getCacheDir()) +
+                size(CacheableWebView.getArchiveDir(mContext)) +
                 size(getDataDirChild("app_webview")) +
                 size(getDataDirChild("app_webview_zygote")) +
                 size(mContext.getDatabasePath("Materialistic.db")) +
@@ -61,9 +62,9 @@ public class OfflineCacheManager {
 
     public void clear() {
         deleteContents(mContext.getCacheDir());
+        deleteContents(CacheableWebView.getArchiveDir(mContext));
         deleteContents(getDataDirChild("app_webview"));
         deleteContents(getDataDirChild("app_webview_zygote"));
-        ArticleCache.clear(mContext);
         HackerNewsItemCache.clear(mContext);
         StoryListCache.clear(mContext);
         mDatabase.getReadableDao().deleteAll();
@@ -71,19 +72,25 @@ public class OfflineCacheManager {
 
     public void garbageCollect() {
         RetainedCache retainedCache = collectRetainedCache();
+        if (retainedCache.itemIds.isEmpty()) {
+            // No committed story lists and no saved stories: there is nothing meaningful to
+            // prune against. Running anyway would interpret "retain nothing" as "delete every
+            // cached item, archive and readability entry" - a total offline-data wipe on what
+            // is most likely a transient state (e.g. a fetch failure).
+            return;
+        }
         HackerNewsItemCache.retainOnly(mContext, retainedCache.itemIds);
-        ArticleCache.retainOnly(mContext, retainedCache.articleUrls);
+        // Article cached-ness is derived from the archive files themselves, so deleting the
+        // stale ones below is all the article bookkeeping there is. The cache dir is scanned
+        // too so archives saved there by older versions get cleaned up.
+        deleteStaleWebArchives(CacheableWebView.getArchiveDir(mContext), retainedCache.articleUrls);
         deleteStaleWebArchives(mContext.getCacheDir(), retainedCache.articleUrls);
         // Intentionally do NOT prune the OkHttp disk cache here. It is the app's opportunistic
         // offline tier: OfflineItemCache (the green checkmark) and getItem(MODE_CACHE) both treat
         // an item as cached when it's in the OkHttp cache, even after it's evicted from
         // HackerNewsItemCache. Pruning it by hot-cache membership evicts readable browsed stories
         // and turns checkmarked items into cache misses. The cache is already bounded (20 MB LRU).
-        if (retainedCache.itemIds.isEmpty()) {
-            mDatabase.getReadableDao().deleteAll();
-        } else {
-            mDatabase.getReadableDao().deleteExcept(new ArrayList<>(retainedCache.itemIds));
-        }
+        mDatabase.getReadableDao().deleteExcept(new ArrayList<>(retainedCache.itemIds));
     }
 
     private RetainedCache collectRetainedCache() {

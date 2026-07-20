@@ -38,6 +38,7 @@ import java.util.Map;
 public class CacheableWebView extends WebView {
     private static final String CACHE_PREFIX = "webarchive-";
     private static final String CACHE_EXTENSION = ".mht";
+    private static final String ARCHIVE_DIR = "webarchives";
     private static final String SNAPSHOT_LOCATION_HEADER = "Snapshot-Content-Location:";
     private ArchiveClient mArchiveClient = new ArchiveClient();
 
@@ -131,7 +132,10 @@ public class CacheableWebView extends WebView {
         if (cacheFile.exists()) {
             if (isValidArchive(cacheFile)) {
                 // Serve the saved archive: works offline, loads fast, and avoids re-fetching. A
-                // file:// URL loads regardless of cache mode.
+                // file:// URL loads regardless of cache mode. Nothing to archive during this
+                // load - and if the user later clicks a link out of the archive, a stale
+                // cacheFileName would let that page overwrite this article's archive.
+                mArchiveClient.cacheFileName = null;
                 getSettings().setCacheMode(WebSettings.LOAD_CACHE_ONLY);
                 return Uri.fromFile(cacheFile).toString();
             }
@@ -151,7 +155,7 @@ public class CacheableWebView extends WebView {
     // A usable archive is a Blink MHTML snapshot of a real web page, recorded in its
     // Snapshot-Content-Location header. Snapshots of anything else (about:blank,
     // chrome-error://…) render as an empty page.
-    private static boolean isValidArchive(File file) {
+    static boolean isValidArchive(File file) {
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(new FileInputStream(file), "UTF-8"))) {
             for (int i = 0; i < 10; i++) {
@@ -174,9 +178,37 @@ public class CacheableWebView extends WebView {
         return getArchiveFile(getContext(), url).getAbsolutePath();
     }
 
+    // Archives are the offline reading feature, not a disposable cache: under storage
+    // pressure installd purges files in getCacheDir() (observed wiping every archive minutes
+    // after the hot cache saved them), so they live in filesDir instead. Growth is bounded by
+    // OfflineCacheManager.garbageCollect(), which retains only the current hot-cache lists
+    // and saved stories.
+    public static File getArchiveDir(Context context) {
+        return new File(context.getApplicationContext().getFilesDir(), ARCHIVE_DIR);
+    }
+
     public static File getArchiveFile(Context context, String url) {
-        return new File(context.getApplicationContext().getCacheDir(),
-                CACHE_PREFIX + url.hashCode() + CACHE_EXTENSION);
+        File dir = getArchiveDir(context);
+        //noinspection ResultOfMethodCallIgnored
+        dir.mkdirs();
+        File file = new File(dir, CACHE_PREFIX + url.hashCode() + CACHE_EXTENSION);
+        if (!file.exists()) {
+            // Rescue any archive an older version saved into the purgeable cache dir.
+            File legacy = new File(context.getApplicationContext().getCacheDir(), file.getName());
+            if (legacy.exists()) {
+                //noinspection ResultOfMethodCallIgnored
+                legacy.renameTo(file);
+            }
+        }
+        return file;
+    }
+
+    public static boolean hasValidArchive(Context context, String url) {
+        if (TextUtils.isEmpty(url)) {
+            return false;
+        }
+        File file = getArchiveFile(context, url);
+        return file.exists() && isValidArchive(file);
     }
 
     public static boolean isArchiveFile(File file) {
@@ -204,9 +236,32 @@ public class CacheableWebView extends WebView {
             }
             if (cacheFileName != null && lastProgress != 100 && newProgress == 100) {
                 lastProgress = newProgress;
-                view.saveWebArchive(cacheFileName);
+                saveArchive(view, cacheFileName);
             }
         }
 
+        private void saveArchive(android.webkit.WebView view, final String fileName) {
+            // The callback form tells us whether the write actually happened. Snapshots of an
+            // error page pass the network-URL check above (a failed navigation keeps the
+            // requested URL) but fail isValidArchive; keeping one around would be served as
+            // the page forever, i.e. a permanently blank article.
+            view.saveWebArchive(fileName, false, value -> {
+                File file = new File(fileName);
+                if (value == null || !isValidArchive(file)) {
+                    //noinspection ResultOfMethodCallIgnored
+                    file.delete();
+                } else {
+                    onArchiveSaved(fileName);
+                }
+            });
+        }
+
+        /**
+         * Called once a page archive has been written and validated. Unlike progress reaching
+         * 100, this means the page is actually available offline.
+         */
+        protected void onArchiveSaved(String fileName) {
+            // override to handle archive completion
+        }
     }
 }

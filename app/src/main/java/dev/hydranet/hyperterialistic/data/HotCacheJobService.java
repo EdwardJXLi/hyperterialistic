@@ -34,6 +34,7 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.inject.Inject;
 
@@ -58,6 +59,10 @@ public class HotCacheJobService extends JobService {
     @Inject RestServiceFactory mFactory;
     @Inject ReadabilityClient mReadabilityClient;
     @Inject LocalCache mLocalCache;
+    // The periodic and run-now jobs can be dispatched at the same time (both are scheduled on
+    // every app launch). Two concurrent passes do identical work and, worse, race each other's
+    // commit + garbage collection over the same shared state.
+    private static final AtomicBoolean sSyncRunning = new AtomicBoolean();
     private volatile Thread mThread;
     private NotificationManager mNotificationManager;
 
@@ -81,16 +86,23 @@ public class HotCacheJobService extends JobService {
     public boolean onStartJob(JobParameters params) {
         if (!Preferences.Offline.isHotCacheEnabled(this) ||
                 !Preferences.Offline.currentConnectionEnabled(this)) {
-            jobFinished(params, false);
+            return false;
+        }
+        if (!sSyncRunning.compareAndSet(false, true)) {
+            // Another hot-cache pass is already running; it does the same work.
             return false;
         }
         mThread = new Thread(() -> {
             Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
-            if (cacheHotStories()) {
-                new OfflineCacheManager(this).garbageCollect();
+            try {
+                if (cacheHotStories()) {
+                    new OfflineCacheManager(this).garbageCollect();
+                }
+            } finally {
+                sSyncRunning.set(false);
+                cancelProgress();
+                jobFinished(params, false);
             }
-            cancelProgress();
-            jobFinished(params, false);
         }, "hot-cache-sync");
         mThread.start();
         return true;
@@ -103,6 +115,7 @@ public class HotCacheJobService extends JobService {
             thread.interrupt();
             mThread = null;
         }
+        sSyncRunning.set(false);
         cancelProgress();
         return true;
     }
@@ -111,8 +124,8 @@ public class HotCacheJobService extends JobService {
         HackerNewsClient.RestService service = mFactory.create(HackerNewsClient.BASE_API_URL,
                 HackerNewsClient.RestService.class);
         int limit = Preferences.Offline.getHotCacheCount(this);
-        int[] topStories = networkTopStories(service);
-        int[] bestStories = networkBestStories(service);
+        int[] topStories = fetchStoryIds(service, true);
+        int[] bestStories = fetchStoryIds(service, false);
         Set<Integer> ids = new LinkedHashSet<>();
         addStories(ids, topStories, limit);
         addStories(ids, bestStories, limit);
@@ -240,17 +253,34 @@ public class HotCacheJobService extends JobService {
         }
     }
 
-    private int[] networkTopStories(HackerNewsClient.RestService service) {
-        try {
-            return service.networkTopStories().execute().body();
-        } catch (IOException e) {
-            return null;
+    // A single flaky fetch here silently drops half the hot cache for this pass (its list
+    // never syncs and its committed ids go stale), so retry with backoff and finally fall
+    // back to the HTTP cache, which usually holds a copy fetched moments ago by the story
+    // list UI.
+    private int[] fetchStoryIds(HackerNewsClient.RestService service, boolean top) {
+        for (int attempt = 0; attempt < 3; attempt++) {
+            if (Thread.currentThread().isInterrupted()) {
+                return null;
+            }
+            try {
+                int[] ids = (top ? service.networkTopStories() : service.networkBestStories())
+                        .execute().body();
+                if (ids != null && ids.length > 0) {
+                    return ids;
+                }
+            } catch (IOException ignored) {
+                // retry below
+            }
+            try {
+                Thread.sleep(2000L << attempt);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return null;
+            }
         }
-    }
-
-    private int[] networkBestStories(HackerNewsClient.RestService service) {
         try {
-            return service.networkBestStories().execute().body();
+            return (top ? service.cachedTopStories() : service.cachedBestStories())
+                    .execute().body();
         } catch (IOException e) {
             return null;
         }

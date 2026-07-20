@@ -451,7 +451,7 @@ public class ItemActivity extends InjectableActivity implements ItemFragment.Ite
             return;
         }
         mSyncedOpenedItemId = itemId;
-        mSyncScheduler.scheduleSync(this, itemId);
+        mSyncScheduler.scheduleOpenedItemSync(this, itemId);
     }
 
     private void decorateFavorite(boolean isFavorite) {
