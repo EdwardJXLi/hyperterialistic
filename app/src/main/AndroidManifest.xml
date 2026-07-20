@@ -34,6 +34,18 @@
     <uses-permission android:name="dev.hydranet.hyperterialistic.permission.SYNC_ITEM" />
     <uses-permission android:name="dev.hydranet.hyperterialistic.permission.AUTHENTICATE_ACCOUNTS" />
 
+    <!-- AppUtils discovers browsers before opening links from comment text. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="http" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+    </queries>
+
     <uses-sdk tools:overrideLibrary="androidx.browser" />
 
     <application
