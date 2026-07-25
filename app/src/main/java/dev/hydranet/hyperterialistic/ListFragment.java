@@ -100,7 +100,11 @@ public class ListFragment extends BaseListFragment {
     };
 
     public interface RefreshCallback {
-        void onRefreshed();
+        /**
+         * @param updated true if the delivered list came off the network, false if it was served
+         *                from a cache after the fetch failed or timed out
+         */
+        void onRefreshed(boolean updated);
     }
 
     @Override
@@ -221,11 +225,13 @@ public class ListFragment extends BaseListFragment {
                 return;
             }
             if (itemLists.first != null) {
-                onItemsLoaded(itemLists.first);
+                // The previously delivered list, re-rendered so the diff against the current one
+                // can flag what's new. It isn't itself a fresh result, so it never restamps.
+                onItemsLoaded(itemLists.first, false);
             }
             // Surface the current result even when null, else a (null, null) pair leaves the spinner stuck.
             if (itemLists.second != null || itemLists.first == null) {
-                onItemsLoaded(itemLists.second);
+                onItemsLoaded(itemLists.second, mStoryListViewModel.isLastResultUpdated());
             }
         });
     }
@@ -325,7 +331,7 @@ public class ListFragment extends BaseListFragment {
     }
 
     @Synthetic
-    void onItemsLoaded(Item[] items) {
+    void onItemsLoaded(Item[] items, boolean updated) {
         if (!isAttached()) {
             return;
         }
@@ -352,7 +358,7 @@ public class ListFragment extends BaseListFragment {
             mErrorView.setVisibility(View.GONE);
             mSwipeRefreshLayout.setRefreshing(false);
             if (mRefreshCallback != null) {
-                mRefreshCallback.onRefreshed();
+                mRefreshCallback.onRefreshed(updated);
             }
         }
     }

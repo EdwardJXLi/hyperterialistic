@@ -24,6 +24,7 @@ public class StoryListViewModel extends ViewModel {
     private Scheduler mIoThreadScheduler;
     private MutableLiveData<Pair<Item[], Item[]>> mItems; // first = last updated, second = current
     private Subscription mSubscription;
+    private boolean mLastResultUpdated;
 
     public void inject(ItemManager itemManager, Scheduler ioThreadScheduler) {
         mItemManager = itemManager;
@@ -52,13 +53,21 @@ public class StoryListViewModel extends ViewModel {
         if (mSubscription != null) {
             mSubscription.unsubscribe();
         }
-        Observable<Item[]> load = Observable.fromCallable(
-                () -> mItemManager.getStories(filter, cacheMode));
+        // getStories returns null when the fetch failed, so substituting the cache is done here
+        // rather than down in the client: that's what keeps "this is fresh" separable from "this
+        // is what we had", which the last-updated label depends on.
+        Observable<Result> load = Observable
+                .fromCallable(() -> mItemManager.getStories(filter, cacheMode))
+                .flatMap(items -> items != null ?
+                        // A MODE_CACHE load succeeds without ever asking the network, so it is
+                        // never a fresh result no matter that it returned something.
+                        Observable.just(new Result(items, cacheMode != ItemManager.MODE_CACHE)) :
+                        cachedResult(filter).defaultIfEmpty(new Result(null, false)));
         if (cacheMode != ItemManager.MODE_CACHE) {
-            // Falls back to the cached feed, or to null - which leaves whatever is on screen
+            // Falls back to the cached feed, or to null items - which leaves whatever is on screen
             // alone. Emitting either way is what stops the refresh spinner.
             load = load.timeout(LOAD_TIMEOUT_SECONDS, TimeUnit.SECONDS,
-                    cachedStories(filter).defaultIfEmpty(null));
+                    cachedResult(filter).defaultIfEmpty(new Result(null, false)));
         }
         if (cacheMode == ItemManager.MODE_DEFAULT) {
             // A dead-but-connected link (the subway case) still looks online, so the network load
@@ -66,12 +75,16 @@ public class StoryListViewModel extends ViewModel {
             // what's already cached first and let the network result replace it when it lands.
             // Only for the automatic load: a pull-to-refresh asks for fresh data, and its list is
             // already on screen, so pushing the cached one back over it would just show older data.
-            load = Observable.concat(cachedStories(filter), load);
+            load = Observable.concat(cachedResult(filter), load);
         }
         mSubscription = load
                 .subscribeOn(mIoThreadScheduler)
                 .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(this::setItems, throwable -> setItems(null));
+                .subscribe(this::setResult, throwable -> setResult(new Result(null, false)));
+    }
+
+    private Observable<Result> cachedResult(String filter) {
+        return cachedStories(filter).map(items -> new Result(items, false));
     }
 
     // subscribeOn is set here rather than left to the caller because the timeout operator
@@ -87,6 +100,22 @@ public class StoryListViewModel extends ViewModel {
         return mSubscription != null && !mSubscription.isUnsubscribed();
     }
 
+    /**
+     * Whether the result currently held actually came off the network. False when it was served
+     * from a cache because the fetch failed or timed out - the feed is readable either way, but
+     * calling it freshly updated would be a lie.
+     */
+    public boolean isLastResultUpdated() {
+        return mLastResultUpdated;
+    }
+
+    private void setResult(Result result) {
+        // Safe to pair with the value below because setValue dispatches to observers synchronously
+        // on this thread, so the flag can't be overwritten before they read it.
+        mLastResultUpdated = result.updated;
+        setItems(result.items);
+    }
+
     void setItems(Item[] items) {
         mItems.setValue(Pair.create(mItems.getValue() != null ? mItems.getValue().second : null, items));
     }
@@ -98,5 +127,15 @@ public class StoryListViewModel extends ViewModel {
             mSubscription = null;
         }
         super.onCleared();
+    }
+
+    private static final class Result {
+        final Item[] items;
+        final boolean updated;
+
+        Result(Item[] items, boolean updated) {
+            this.items = items;
+            this.updated = updated;
+        }
     }
 }

@@ -107,6 +107,10 @@ public class WidgetService extends RemoteViewsService {
         public void onDataSetChanged() {
             mItems = mItemManager.getStories(mFilter,
                     AppUtils.cacheModeForConnection(mContext, ItemManager.MODE_NETWORK));
+            if (mItems == null) {
+                // The fetch failed; a stale widget beats an empty one.
+                mItems = mItemManager.getCachedStories(mFilter);
+            }
         }
 
         @Override

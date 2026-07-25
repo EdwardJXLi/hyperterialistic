@@ -118,8 +118,13 @@ public abstract class BaseStoriesActivity extends BaseListActivity
     }
 
     @Override
-    public void onRefreshed() {
+    public void onRefreshed(boolean updated) {
         onItemSelected(null);
+        if (!updated) {
+            // Served from cache because the fetch failed; the subtitle still describes whenever
+            // the feed genuinely last came off the network.
+            return;
+        }
         mLastUpdated = System.currentTimeMillis();
         mHandler.removeCallbacks(mLastUpdateTask);
         mHandler.post(mLastUpdateTask);
