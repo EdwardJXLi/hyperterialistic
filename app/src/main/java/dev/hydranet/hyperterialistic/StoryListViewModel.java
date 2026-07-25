@@ -47,10 +47,12 @@ public class StoryListViewModel extends ViewModel {
         }
         Observable<Item[]> load = Observable.fromCallable(
                 () -> mItemManager.getStories(filter, cacheMode));
-        if (cacheMode != ItemManager.MODE_CACHE) {
+        if (cacheMode == ItemManager.MODE_DEFAULT) {
             // A dead-but-connected link (the subway case) still looks online, so the network load
             // burns its full call timeout before falling back - half a minute of blank feed. Emit
             // what's already cached first and let the network result replace it when it lands.
+            // Only for the automatic load: a pull-to-refresh asks for fresh data, and its list is
+            // already on screen, so pushing the cached one back over it would just show older data.
             load = Observable.concat(cachedStories(filter), load);
         }
         mSubscription = load
