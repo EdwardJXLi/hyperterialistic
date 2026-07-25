@@ -147,16 +147,17 @@ public class HackerNewsClient implements ItemManager, UserManager {
                 return toItems(cachedIds);
             }
         }
+        // Null means "the fetch failed and no cache tier could stand in", which callers surface by
+        // keeping whatever is already on screen. An empty array would instead be taken at face
+        // value - a refresh on a dead link would wipe the feed and show the empty state.
         try {
             int[] ids = getStoriesCall(filter, cacheMode).execute().body();
             if (ids == null) {
                 ids = StoryListCache.get(mContext, normalizeFilter(filter));
             }
-            Item[] items = toItems(ids);
-            return items != null ? items : new Item[0];
+            return toItems(ids);
         } catch (IOException e) {
-            Item[] cached = getCachedStories(filter);
-            return cached != null ? cached : new Item[0];
+            return getCachedStories(filter);
         }
     }
 
