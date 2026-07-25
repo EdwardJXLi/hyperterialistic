@@ -19,6 +19,8 @@ package dev.hydranet.hyperterialistic;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -26,6 +28,7 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Toast;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
@@ -59,6 +62,10 @@ public class ItemFragment extends LazyLoadFragment implements Scrollable, Naviga
     private static final String STATE_ITEM_ID = "state:itemId";
     private static final String STATE_ADAPTER_ITEMS = "state:adapterItems";
     private static final String STATE_CACHE_MODE = "state:cacheMode";
+    // A refresh on a dead-but-connected link would otherwise hold the spinner for the whole call
+    // timeout and then end without a word. Give up sooner and say so - the thread already on
+    // screen stays put, and a response that arrives late still binds.
+    private static final long REFRESH_TIMEOUT_MILLIS = 8000;
     private RecyclerView mRecyclerView;
     private View mEmptyView;
     private Item mItem;
@@ -72,6 +79,14 @@ public class ItemFragment extends LazyLoadFragment implements Scrollable, Naviga
     private final Preferences.Observable mPreferenceObservable = new Preferences.Observable();
     private CommentItemDecoration mItemDecoration;
     private View mFragmentView;
+    private final Handler mHandler = new Handler(Looper.getMainLooper());
+    private final Runnable mRefreshTimeout = () -> {
+        if (!isAttached()) {
+            return;
+        }
+        mSwipeRefreshLayout.setRefreshing(false);
+        showRefreshFailed();
+    };
 
     @Override
     public void onAttach(Context context) {
@@ -129,6 +144,8 @@ public class ItemFragment extends LazyLoadFragment implements Scrollable, Naviga
                 if (mAdapter != null) {
                     mAdapter.setCacheMode(mCacheMode);
                 }
+                mHandler.removeCallbacks(mRefreshTimeout);
+                mHandler.postDelayed(mRefreshTimeout, REFRESH_TIMEOUT_MILLIS);
                 loadKidData();
             });
         }
@@ -166,6 +183,7 @@ public class ItemFragment extends LazyLoadFragment implements Scrollable, Naviga
     @Override
     public void onDestroy() {
         super.onDestroy();
+        mHandler.removeCallbacks(mRefreshTimeout);
         if (mAdapter != null) {
             mAdapter.detach(getActivity(), mRecyclerView);
         }
@@ -221,13 +239,24 @@ public class ItemFragment extends LazyLoadFragment implements Scrollable, Naviga
     }
 
     void onItemLoaded(@Nullable Item item) {
+        // Only complain when the user asked for this load; the spinner is off for the initial one,
+        // which has its own empty state.
+        boolean refreshRequested = mSwipeRefreshLayout.isRefreshing();
+        mHandler.removeCallbacks(mRefreshTimeout);
         mSwipeRefreshLayout.setRefreshing(false);
         if (item != null) {
             mAdapterItems = null;
             mItem = item;
             notifyItemLoaded(item);
             bindKidData();
+        } else if (refreshRequested) {
+            showRefreshFailed();
         }
+    }
+
+    @Synthetic
+    void showRefreshFailed() {
+        Toast.makeText(getActivity(), R.string.connection_error, Toast.LENGTH_SHORT).show();
     }
 
     private void bindKidData() {
