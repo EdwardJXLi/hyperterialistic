@@ -5,6 +5,8 @@ import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 import androidx.core.util.Pair;
 
+import java.util.concurrent.TimeUnit;
+
 import dev.hydranet.hyperterialistic.data.Item;
 import dev.hydranet.hyperterialistic.data.ItemManager;
 import rx.Observable;
@@ -13,6 +15,11 @@ import rx.Subscription;
 import rx.android.schedulers.AndroidSchedulers;
 
 public class StoryListViewModel extends ViewModel {
+    // A refresh is a gesture the user is watching, so it shouldn't hold the spinner for the whole
+    // 30s call timeout when the link is dead. Give up well before that and settle on the cached
+    // feed instead. Still long enough for a slow-but-working connection to answer.
+    private static final int LOAD_TIMEOUT_SECONDS = 8;
+
     private ItemManager mItemManager;
     private Scheduler mIoThreadScheduler;
     private MutableLiveData<Pair<Item[], Item[]>> mItems; // first = last updated, second = current
@@ -47,6 +54,12 @@ public class StoryListViewModel extends ViewModel {
         }
         Observable<Item[]> load = Observable.fromCallable(
                 () -> mItemManager.getStories(filter, cacheMode));
+        if (cacheMode != ItemManager.MODE_CACHE) {
+            // Falls back to the cached feed, or to null - which leaves whatever is on screen
+            // alone. Emitting either way is what stops the refresh spinner.
+            load = load.timeout(LOAD_TIMEOUT_SECONDS, TimeUnit.SECONDS,
+                    cachedStories(filter).defaultIfEmpty(null));
+        }
         if (cacheMode == ItemManager.MODE_DEFAULT) {
             // A dead-but-connected link (the subway case) still looks online, so the network load
             // burns its full call timeout before falling back - half a minute of blank feed. Emit
@@ -61,8 +74,11 @@ public class StoryListViewModel extends ViewModel {
                 .subscribe(this::setItems, throwable -> setItems(null));
     }
 
+    // subscribeOn is set here rather than left to the caller because the timeout operator
+    // subscribes to this from its own scheduler, and reading the caches is disk work.
     private Observable<Item[]> cachedStories(String filter) {
         return Observable.fromCallable(() -> mItemManager.getCachedStories(filter))
+                .subscribeOn(mIoThreadScheduler)
                 .filter(items -> items != null && items.length > 0)
                 .onErrorResumeNext(Observable.empty());
     }
