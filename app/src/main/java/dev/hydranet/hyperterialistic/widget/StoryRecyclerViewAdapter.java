@@ -391,6 +391,12 @@ public class StoryRecyclerViewAdapter extends
     }
 
     @Override
+    protected boolean isItemDisplayable(Item item) {
+        // Story lists built from the offline cache come with their bodies attached.
+        return item != null && !TextUtils.isEmpty(item.getTitle());
+    }
+
+    @Override
     protected Item getItem(int position) {
         if (position < 0 || position >= getItems().size()) {
             return null;

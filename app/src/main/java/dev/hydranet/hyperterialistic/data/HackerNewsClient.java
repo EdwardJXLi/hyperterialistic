@@ -19,6 +19,7 @@ package dev.hydranet.hyperterialistic.data;
 import android.content.Context;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import java.io.IOException;
 
@@ -40,6 +41,8 @@ public class HackerNewsClient implements ItemManager, UserManager {
     public static final String HOST = "hacker-news.firebaseio.com";
     public static final String BASE_WEB_URL = "https://news.ycombinator.com";
     public static final String WEB_ITEM_PATH = BASE_WEB_URL + "/item?id=%s";
+    // Local revision marking an item the list adapters still have to (re)load.
+    private static final int NEEDS_LOAD_REVISION = -1;
     static final String BASE_API_URL = "https://" + HOST + "/v0/";
     @Inject @Named(DataModule.IO_THREAD) Scheduler mIoScheduler;
     @Inject @Named(DataModule.MAIN_THREAD) Scheduler mMainThreadScheduler;
@@ -65,19 +68,18 @@ public class HackerNewsClient implements ItemManager, UserManager {
         if (listener == null) {
             return;
         }
+        // The cache fallbacks stay upstream of observeOn: getCachedStories reads the disk caches,
+        // which must not happen on the main thread.
         Observable.defer(() -> getStoriesObservable(filter, cacheMode))
+                .map(items -> items != null ? items : getCachedStories(filter))
+                .onErrorResumeNext(t -> {
+                    Item[] cached = getCachedStories(filter);
+                    return cached != null ? Observable.just(cached) : Observable.error(t);
+                })
                 .subscribeOn(mIoScheduler)
                 .observeOn(mMainThreadScheduler)
-                .subscribe(items -> listener.onResponse(items != null ?
-                                items : getCachedStories(filter)),
-                        t -> {
-                            Item[] cached = getCachedStories(filter);
-                            if (cached != null) {
-                                listener.onResponse(cached);
-                            } else {
-                                listener.onError(t != null ? t.getMessage() : "");
-                            }
-                        });
+                .subscribe(listener::onResponse,
+                        t -> listener.onError(t != null ? t.getMessage() : ""));
     }
 
     @Override
@@ -154,22 +156,7 @@ public class HackerNewsClient implements ItemManager, UserManager {
             return items != null ? items : new Item[0];
         } catch (IOException e) {
             Item[] cached = getCachedStories(filter);
-            if (cached != null) {
-                return cached;
-            }
-            if (cacheMode != MODE_CACHE) {
-                // Same fallback chain as the async path: a stale OkHttp-cached list beats an
-                // empty screen when the network fetch fails on a bad connection.
-                try {
-                    Item[] items = toItems(getStoriesCall(filter, MODE_CACHE).execute().body());
-                    if (items != null) {
-                        return items;
-                    }
-                } catch (IOException ignored) {
-                    // fall through to empty
-                }
-            }
-            return new Item[0];
+            return cached != null ? cached : new Item[0];
         }
     }
 
@@ -304,8 +291,22 @@ public class HackerNewsClient implements ItemManager, UserManager {
         return filter == null ? NEW_FETCH_MODE : filter;
     }
 
-    private Item[] getCachedStories(String filter) {
-        return toItems(StoryListCache.get(mContext, normalizeFilter(filter)));
+    @Override
+    @Nullable
+    public Item[] getCachedStories(String filter) {
+        // The committed hot-cache list first: its item bodies are known to be downloaded. The
+        // OkHttp cache is the weaker second tier - however stale, and it covers new/ask/show/jobs,
+        // which hot caching doesn't.
+        Item[] committed = toItems(StoryListCache.get(mContext, normalizeFilter(filter)));
+        if (committed != null && committed.length > 0) {
+            return committed;
+        }
+        try {
+            Item[] items = toItems(getStoriesCall(filter, MODE_CACHE).execute().body());
+            return items != null && items.length > 0 ? items : null;
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     @NonNull
@@ -352,13 +353,19 @@ public class HackerNewsClient implements ItemManager, UserManager {
         return call;
     }
 
+    // A story list is only ids; the rows come from a per-item fetch. Attaching the cached body up
+    // front lets the list render immediately instead of showing skeleton rows for however long
+    // that fetch takes - forever, when the link reports connected but nothing gets through. The
+    // items are still left needing a load, so each row refreshes behind the cached copy.
     private HackerNewsItem[] toItems(int[] ids) {
         if (ids == null) {
             return null;
         }
         HackerNewsItem[] items = new HackerNewsItem[ids.length];
         for (int i = 0; i < items.length; i++) {
-            HackerNewsItem item = new HackerNewsItem(ids[i]);
+            HackerNewsItem cached = HackerNewsItemCache.get(mContext, String.valueOf(ids[i]));
+            HackerNewsItem item = cached != null ? cached : new HackerNewsItem(ids[i]);
+            item.setLocalRevision(NEEDS_LOAD_REVISION);
             item.rank = i + 1;
             items[i] = item;
         }

@@ -45,10 +45,24 @@ public class StoryListViewModel extends ViewModel {
         if (mSubscription != null) {
             mSubscription.unsubscribe();
         }
-        mSubscription = Observable.fromCallable(() -> mItemManager.getStories(filter, cacheMode))
+        Observable<Item[]> load = Observable.fromCallable(
+                () -> mItemManager.getStories(filter, cacheMode));
+        if (cacheMode != ItemManager.MODE_CACHE) {
+            // A dead-but-connected link (the subway case) still looks online, so the network load
+            // burns its full call timeout before falling back - half a minute of blank feed. Emit
+            // what's already cached first and let the network result replace it when it lands.
+            load = Observable.concat(cachedStories(filter), load);
+        }
+        mSubscription = load
                 .subscribeOn(mIoThreadScheduler)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(this::setItems, throwable -> setItems(null));
+    }
+
+    private Observable<Item[]> cachedStories(String filter) {
+        return Observable.fromCallable(() -> mItemManager.getCachedStories(filter))
+                .filter(items -> items != null && items.length > 0)
+                .onErrorResumeNext(Observable.empty());
     }
 
     public boolean isLoading() {

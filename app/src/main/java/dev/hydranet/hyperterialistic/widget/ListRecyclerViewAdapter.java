@@ -106,7 +106,12 @@ public abstract class ListRecyclerViewAdapter
         clearViewHolder(holder);
         if (!isItemAvailable(item)) {
             loadItem(holder.getAdapterPosition());
-            return;
+            if (!isItemDisplayable(item)) {
+                return;
+            }
+            // The item carries a body from the offline cache, so show it and let the reload above
+            // replace it when it lands. Otherwise the row is a skeleton for as long as the network
+            // takes to answer - which on a dead-but-connected link is the full call timeout.
         }
         // TODO naive launch priority for now
         mCustomTabsDelegate.mayLaunchUrl(Uri.parse(item.getUrl()), null, null);
@@ -173,6 +178,14 @@ public abstract class ListRecyclerViewAdapter
     protected abstract void bindItem(VH holder, int position);
 
     protected abstract boolean isItemAvailable(T item);
+
+    /**
+     * Whether an item that hasn't been loaded yet still holds enough data to render, so the row
+     * can show it instead of a skeleton while the load runs.
+     */
+    protected boolean isItemDisplayable(T item) {
+        return false;
+    }
 
     private void clearViewHolder(VH holder) {
         holder.clear();

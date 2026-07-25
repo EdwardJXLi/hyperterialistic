@@ -79,6 +79,13 @@ public class AlgoliaClient implements ItemManager {
         return mHackerNewsClient.getItem(itemId, cacheMode);
     }
 
+    @Override
+    public Item[] getCachedStories(String filter) {
+        // Search results aren't part of the offline set, and every filter is a distinct query,
+        // so there is nothing to serve without going out to the network.
+        return null;
+    }
+
     protected Observable<AlgoliaHits> searchRx(String filter) {
         // TODO add ETag header
         return sSortByTime ? mRestService.searchByDateRx(filter) : mRestService.searchRx(filter);

@@ -55,6 +55,9 @@ public class HotCacheJobService extends JobService {
     // story list and garbage collect the previous one. Keeps a spotty connection from
     // replacing a working offline set with empty placeholder rows.
     private static final double COMMIT_THRESHOLD = 0.8;
+    // Once this many story bodies in a row fail to download, stop paying the full call timeout
+    // for every remaining one and read from cache instead - the link is dead, not just slow.
+    private static final int MAX_CONSECUTIVE_FAILURES = 3;
 
     @Inject RestServiceFactory mFactory;
     @Inject ReadabilityClient mReadabilityClient;
@@ -135,8 +138,40 @@ public class HotCacheJobService extends JobService {
         }
         updateProgress(0, 0, true);
         int total = ids.size();
-        int downloaded = 0;
+        int progress = 0;
+        // Pass 1: story bodies only. These are what the offline feed renders from, and one small
+        // JSON per story finishes in seconds, so the lists get committed while the job is still
+        // alive. Pass 2 below can run for hours and the scheduler routinely stops it first -
+        // committing only after it would mean the feed is never cached at all.
         int storiesCached = 0;
+        int consecutiveFailures = 0;
+        for (Integer id : ids) {
+            if (Thread.currentThread().isInterrupted()) {
+                return false;
+            }
+            String storyId = String.valueOf(id);
+            HackerNewsItem item = null;
+            if (consecutiveFailures < MAX_CONSECUTIVE_FAILURES) {
+                item = networkStoryBody(service, storyId);
+                consecutiveFailures = item != null ? 0 : consecutiveFailures + 1;
+            }
+            if (item == null) {
+                item = cachedItem(service, storyId);
+            }
+            if (item != null) {
+                storiesCached++;
+            }
+            updateProgress(++progress, total * 2, false);
+        }
+        // Only advance the cached story lists (and let the caller garbage collect the previous
+        // set) once enough story bodies actually downloaded. Otherwise a spotty connection that
+        // fetches the id lists but fails the item downloads would evict a working offline set.
+        if (storiesCached < Math.ceil(total * COMMIT_THRESHOLD)) {
+            return false;
+        }
+        StoryListCache.put(this, ItemManager.TOP_FETCH_MODE, topStories, limit);
+        StoryListCache.put(this, ItemManager.BEST_FETCH_MODE, bestStories, limit);
+        // Pass 2: comments, article archive and readability for each story.
         for (Integer id : ids) {
             if (Thread.currentThread().isInterrupted()) {
                 return false;
@@ -145,24 +180,40 @@ public class HotCacheJobService extends JobService {
             if (!isCached(service, storyId)) {
                 syncStory(storyId);
             }
-            if (cachedItem(service, storyId) != null) {
-                storiesCached++;
-            }
-            downloaded++;
-            updateProgress(downloaded, total, false);
+            updateProgress(++progress, total * 2, false);
         }
-        if (Thread.currentThread().isInterrupted()) {
-            return false;
-        }
-        // Only advance the cached story list (and let the caller garbage collect the previous
-        // set) once enough story bodies actually downloaded. Otherwise a spotty connection that
-        // fetches the id list but fails the item downloads would evict a working offline set.
-        if (storiesCached < Math.ceil(total * COMMIT_THRESHOLD)) {
-            return false;
-        }
-        StoryListCache.put(this, ItemManager.TOP_FETCH_MODE, topStories, limit);
-        StoryListCache.put(this, ItemManager.BEST_FETCH_MODE, bestStories, limit);
         return true;
+    }
+
+    // Deliberately hits the network rather than reusing cachedItem(): the feed row shows the
+    // score and comment count, which go stale between passes. CACHE_CONTROL_MAX_AGE_30M means a
+    // body the story list UI downloaded moments ago still comes off disk without a round trip.
+    @WorkerThread
+    private HackerNewsItem networkStoryBody(@NonNull HackerNewsClient.RestService service,
+                                            @NonNull String id) {
+        for (int attempt = 0; attempt < 2; attempt++) {
+            if (Thread.currentThread().isInterrupted()) {
+                return null;
+            }
+            try {
+                HackerNewsItem item = service.item(id).execute().body();
+                if (item != null) {
+                    HackerNewsItemCache.put(this, item);
+                }
+                // A null body means the item is gone, not that the fetch failed; retrying it
+                // would just burn another call timeout.
+                return item;
+            } catch (IOException ignored) {
+                // retry below, then let the caller fall back to the cache tiers
+            }
+            try {
+                Thread.sleep(1000L << attempt);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return null;
+            }
+        }
+        return null;
     }
 
     @WorkerThread

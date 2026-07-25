@@ -17,6 +17,7 @@
 package dev.hydranet.hyperterialistic.data;
 
 import androidx.annotation.IntDef;
+import androidx.annotation.Nullable;
 import androidx.annotation.StringDef;
 import androidx.annotation.WorkerThread;
 
@@ -89,4 +90,15 @@ public interface ItemManager {
      */
     @WorkerThread
     Item getItem(String itemId, @CacheMode int cacheMode);
+
+    /**
+     * Gets stories that are already stored locally, without ever touching the network. Unlike
+     * {@link #getStories(String, int)} with {@link #MODE_CACHE} this is safe to call while a
+     * network load is in flight, so callers can show something immediately on a bad connection.
+     * @param filter       filter of stories to fetch
+     * @return  locally cached stories, or null if there are none
+     */
+    @WorkerThread
+    @Nullable
+    Item[] getCachedStories(String filter);
 }
